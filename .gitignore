@@ -1,0 +1,6 @@
+**/.idea
+**/*.jpg
+**/*.pgm
+**/*.pklz
+**/*.pkl
+**/*.ipynb_checkpoints

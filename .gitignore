@@ -4,3 +4,4 @@
 **/*.pklz
 **/*.pkl
 **/*.ipynb_checkpoints
+**/Databases

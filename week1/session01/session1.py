@@ -8,7 +8,23 @@ from sklearn.metrics import roc_curve
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import ShuffleSplit
 
+
+def GetLabel(Label):
+    switcher = {
+        1: "coast",
+        2: "forest",
+        3: "highway",
+        4: "inside_city",
+        5: "mountain",
+        6: "Opencountry",
+        7: "street",
+        8: "tallbuilding",
+    }
+    for key, value in switcher.iteritems():
+        if Label == value:
+            return key
 
 def inputImagesLabels():
     train_images_filenames = cPickle.load(open('train_images_filenames.dat', 'r'))
@@ -56,14 +72,14 @@ def featureExtraction(train_images_filenames, train_labels):
 
 
 def trainClassifier(D, L):
-    #for Kfold cross validation
+    # Train a k-nn classifier
     myknn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
     myknn.fit(D, L)
-    st = StratifiedKFold(4, True)
-    cv = st.get_n_splits(D, L)
-    scores = cross_val_score(myknn, D, L, cv)
-    print scores
-    # Train a k-nn classifier
+    #for Kfold cross validation
+    cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
+    scores = cross_val_score(myknn, D, L, cv=cv)
+    #Accuracy for Kfold, scores.mean()
+    print scores, scores.mean()
 
     print 'Training the knn classifier...'
     #myknn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
@@ -77,7 +93,7 @@ def predictAndTest(test_images_filenames, test_labels, myknn,SIFTdetector):
 
     numtestimages = 0
     numcorrect = 0
-    PredictList = np.empty([len(test_images_filenames),0])
+    PredictList = []
     for i in range(len(test_images_filenames)):
         filename = test_images_filenames[i]
         ima = cv2.imread(filename)
@@ -88,11 +104,11 @@ def predictAndTest(test_images_filenames, test_labels, myknn,SIFTdetector):
         predictedclass = values[np.argmax(counts)]
         #print 'image ' + filename + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass
         numtestimages += 1
-        PredictList = np.vstack(PredictList,predictedclass)
+        PredictList.append(GetLabel(predictedclass))
         if predictedclass == test_labels[i]:
             numcorrect += 1
-
-    return numcorrect * 100.0 / numtestimages,PredictList
+    npPredictList = np.array(PredictList)
+    return numcorrect * 100.0 / numtestimages,npPredictList
 
 def evaluation(L,PredictList,scores):
     precision = []

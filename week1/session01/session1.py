@@ -10,6 +10,9 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import ShuffleSplit
 
+#Initial variables
+loadimages = 30
+siftfeatures =100
 
 def GetLabel(Label):
     switcher = {
@@ -38,37 +41,37 @@ def inputImagesLabels():
 
 
 def featureExtraction(train_images_filenames, train_labels):
+
     # create the SIFT detector object
+    SIFTdetector = cv2.SIFT(nfeatures=siftfeatures)
 
-    SIFTdetector = cv2.SIFT(nfeatures=100)
-
-    # read the just 30 train images per class
-    # extract SIFT keypoints and descriptors
     # store descriptors in a python list of numpy arrays
 
-    Train_descriptors = []
     Train_label_per_descriptor = []
+    D = np.empty([1, siftfeatures*128])
 
     for i in range(len(train_images_filenames)):
         filename = train_images_filenames[i]
-        if Train_label_per_descriptor.count(train_labels[i]) < 30:
+        if Train_label_per_descriptor.count(train_labels[i]) < loadimages:
             # print 'Reading image ' + filename
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
+            # extract SIFT keypoints and descriptors
             kpt, des = SIFTdetector.detectAndCompute(gray, None)
-            Train_descriptors.append(des)
+            d = np.zeros([1, siftfeatures * 128])
+            d[0, 0:des.size] = des[0:siftfeatures, 0:128].reshape(1, -1)
+            if(i == 0):
+                D = d
+            else:
+                D = np.vstack((D, d))
             Train_label_per_descriptor.append(train_labels[i])
         # print str(len(kpt)) + ' extracted keypoints and descriptors'
     print 'Features extracted'
+    L = np.array(Train_label_per_descriptor).reshape(-1)
+    print L.shape
+    print D.shape
     # Transform everything to numpy arrays
-
-    D = Train_descriptors[0]
-    L = np.array([Train_label_per_descriptor[0]] * Train_descriptors[0].shape[0])
-
-    for i in range(1, len(Train_descriptors)):
-        D = np.vstack((D, Train_descriptors[i]))
-        L = np.hstack((L, np.array([Train_label_per_descriptor[i]] * Train_descriptors[i].shape[0])))
-    return D, L,SIFTdetector
+    return D, L, SIFTdetector
 
 
 def trainClassifier(D, L):
@@ -99,7 +102,9 @@ def predictAndTest(test_images_filenames, test_labels, myknn,SIFTdetector):
         ima = cv2.imread(filename)
         gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
         kpt, des = SIFTdetector.detectAndCompute(gray, None)
-        predictions = myknn.predict(des)
+        d = np.zeros([1, siftfeatures * 128])
+        d[0, 0:des.size] = des[0:siftfeatures, 0:128].reshape(1, -1)
+        predictions = myknn.predict(d)
         values, counts = np.unique(predictions, return_counts=True)
         predictedclass = values[np.argmax(counts)]
         #print 'image ' + filename + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass

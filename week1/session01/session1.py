@@ -48,7 +48,7 @@ def SIFTfeatures(filenames,labels):
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
             kpt, des = SIFTdetector.detectAndCompute(gray, None)
             descriptors.append(des)
-            label_per_descriptor.append(labels[i])#REDUNDANT!
+            label_per_descriptor.append(labels[i])
     return descriptors,label_per_descriptor
 
 def featureExtraction(train_images_filenames, train_labels):
@@ -83,13 +83,13 @@ def trainClassifier(D, L, k=5):
     return myknn
 
 
-def predictAndTest(test_images_filenames, test_labels, myknn):
+def predictAndTest( myknn,Test_descriptors,Test_label_per_descriptor):
     # get all the test data and predict their labels
 
     numtestimages = 0
     numcorrect = 0
     PredictList = []
-    Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
+
     for i in range(len(Test_descriptors)):
         predictions = myknn.predict(Test_descriptors[i])
         values, counts = np.unique(predictions, return_counts=True)
@@ -194,7 +194,13 @@ def __main__():
     kPredictions = []
     for k in kVector:
         myknn = trainClassifier(D, L, k)
-        accuracy,PredictList = predictAndTest(test_images_filenames, test_labels, myknn)
+
+        # if features.contains("SIFT"):
+        Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
+        #if features.contains("hist"):
+            #use hist
+
+        accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
         kPredictions.append(PredictList)
         print ('for K ='+ str(k) + 'accuracy is ' + str(accuracy))
 

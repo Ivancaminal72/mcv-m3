@@ -192,14 +192,14 @@ def __main__():
 
     kVector=np.arange(2,9,1)
     kPredictions = []
+
+    # if features.contains("SIFT"):
+    Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
+    # if features.contains("hist"):
+    # use hist
+
     for k in kVector:
         myknn = trainClassifier(D, L, k)
-
-        # if features.contains("SIFT"):
-        Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
-        #if features.contains("hist"):
-            #use hist
-
         accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
         kPredictions.append(PredictList)
         print ('for K ='+ str(k) + 'accuracy is ' + str(accuracy))

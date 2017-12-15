@@ -10,8 +10,12 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import ShuffleSplit
 
+features = "hist" #SIFT/hist
+agregate_sift_desc=True
+nfeatures = 100
+loadimages = 30
 
-def GetLabel(Label):
+def GetKey(Label):
     switcher = {
         1: "coast",
         2: "forest",
@@ -37,18 +41,25 @@ def inputImagesLabels():
     return train_images_filenames, test_images_filenames, train_labels, test_labels
 
 def SIFTfeatures(filenames,labels):
-    SIFTdetector = cv2.SIFT(nfeatures=100)
+    SIFTdetector = cv2.SIFT(nfeatures=nfeatures)
     descriptors = []
     label_per_descriptor = []
+
     for i in range(len(filenames)):
         filename = filenames[i]
-        if label_per_descriptor.count(labels[i]) < 30:
+        if label_per_descriptor.count(labels[i]) < loadimages:
             # print 'Reading image ' + filename
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
             kpt, des = SIFTdetector.detectAndCompute(gray, None)
-            descriptors.append(des)
+            if agregate_sift_desc:
+                d = np.zeros([1, nfeatures * 128])
+                d[0, 0:des.size] = des[0:nfeatures, 0:128].reshape(1, -1)
+                descriptors.append(list(d))
+            else:
+                descriptors.append(des)
             label_per_descriptor.append(labels[i])
+
     return descriptors,label_per_descriptor
 
 def histfeatures(filenames,labels):
@@ -57,7 +68,7 @@ def histfeatures(filenames,labels):
 
     for i in range(len(filenames)):
         filename = filenames[i]
-        if label_per_descriptor.count(labels[i]) < 30:
+        if label_per_descriptor.count(labels[i]) < loadimages:
             # print 'Reading image ' + filename
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
@@ -66,7 +77,7 @@ def histfeatures(filenames,labels):
             label_per_descriptor.append(labels[i])
     return descriptors,label_per_descriptor
 
-def featureExtraction(train_images_filenames, train_labels,features):
+def featureExtraction(train_images_filenames, train_labels):
     Train_descriptors=[]
     Train_label_per_descriptor=[]
     if features == "SIFT":
@@ -78,13 +89,20 @@ def featureExtraction(train_images_filenames, train_labels,features):
         exit(-1)
     print 'Features extracted'
     # Transform everything to numpy arrays
+    if features == "SIFT" and not agregate_sift_desc:
+        D = Train_descriptors[0]
+        L = np.array([Train_label_per_descriptor[0]] * Train_descriptors[0].shape[0])
 
-    D = Train_descriptors[0]
-    L = np.array([Train_label_per_descriptor[0]] * Train_descriptors[0].shape[0])
+        for i in range(1, len(Train_descriptors)):
+            D = np.vstack((D, Train_descriptors[i]))
+            L = np.hstack((L, np.array([Train_label_per_descriptor[i]] * Train_descriptors[i].shape[0])))
+    else:
+        D = np.array(Train_descriptors[0])
+        L = np.array(Train_label_per_descriptor[0])
 
-    for i in range(1, len(Train_descriptors)):
-        D = np.vstack((D, Train_descriptors[i]))
-        L = np.hstack((L, np.array([Train_label_per_descriptor[i]] * Train_descriptors[i].shape[0])))
+        for i in range(1, len(Train_descriptors)):
+            D = np.vstack((D, np.array(Train_descriptors[i])))
+            L = np.hstack((L, np.array(Train_label_per_descriptor[i])))
     return D, L
 
 
@@ -113,12 +131,12 @@ def predictAndTest( myknn,Test_descriptors,Test_label_per_descriptor):
     PredictList = []
 
     for i in range(len(Test_descriptors)):
-        predictions = myknn.predict(Test_descriptors[i])
+        predictions = myknn.predict(Test_descriptors[i].reshape(1, -1))
         values, counts = np.unique(predictions, return_counts=True)
         predictedclass = values[np.argmax(counts)]
         #print 'image ' + test_images_filenames[i] + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass
         numtestimages += 1
-        PredictList.append(GetLabel(predictedclass))
+        PredictList.append(GetKey(predictedclass))
         if predictedclass == Test_label_per_descriptor[i]:
             numcorrect += 1
     npPredictList = np.array(PredictList)
@@ -208,27 +226,18 @@ def rocCurve():
     plt.show()
 
 def __main__():
-    features = "SIFT" #SIFT/hist
     start = time.time()
     train_images_filenames, test_images_filenames, train_labels, test_labels = inputImagesLabels()
-    D,L = featureExtraction(train_images_filenames, train_labels,features)
+    D,L = featureExtraction(train_images_filenames, train_labels)
 
     kVector=np.arange(2,9,1)
     kPredictions = []
-    Test_descriptors=[]
-    Test_label_per_descriptor=[]
-    if features == "SIFT":
-        Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
-    elif features == "hist":
-        Test_descriptors, Test_label_per_descriptor = histfeatures(test_images_filenames, test_labels)
-    else:
-        print('feature specified not found')
-        exit(-1)
+    Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
     for k in kVector:
         myknn = trainClassifier(D, L, k)
         accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
         kPredictions.append(PredictList)
-        print ('for K ='+ str(k) + 'accuracy is ' + str(accuracy))
+        print ('for K = '+ str(k) + 'accuracy is ' + str(accuracy))
 
     evaluation(L,kPredictions)
     #print 'Final accuracy: ' + str(accuracy)

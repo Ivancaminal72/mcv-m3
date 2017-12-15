@@ -8,12 +8,14 @@ from sklearn.metrics import roc_curve
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import ShuffleSplit
 
-features = "SIFT" #SIFT/hist
-agregate_sift_desc=True
-nfeatures = 100
-loadimages = 30
+features           = "SIFT" #SIFT/hist
+classifier         = "KNN"
+agregate_sift_desc = True
+nfeatures          = 100
+loadimages         = 30
 
 def GetKey(Label):
     switcher = {
@@ -29,12 +31,13 @@ def GetKey(Label):
     for key, value in switcher.iteritems():
         if Label == value:
             return key
+    return Label
 
 def inputImagesLabels():
     train_images_filenames = cPickle.load(open('train_images_filenames.dat', 'r'))
-    test_images_filenames = cPickle.load(open('test_images_filenames.dat', 'r'))
-    train_labels = cPickle.load(open('train_labels.dat', 'r'))
-    test_labels = cPickle.load(open('test_labels.dat', 'r'))
+    test_images_filenames  = cPickle.load(open('test_images_filenames.dat', 'r'))
+    train_labels           = cPickle.load(open('train_labels.dat', 'r'))
+    test_labels            = cPickle.load(open('test_labels.dat', 'r'))
 
     # print 'Loaded ' + str(len(train_images_filenames)) + ' training images filenames with classes ', set(train_labels)
     # print 'Loaded ' + str(len(test_images_filenames)) + ' testing images filenames with classes ', set(test_labels)
@@ -126,38 +129,48 @@ def featureExtraction(filenames, labels):
     return D, L
 
 
-def trainClassifier(D, L, k=5):
+def trainKNNClassifier(D, L, k=5):
     # Train a k-nn classifier
-
     print 'Training the knn classifier...'
     myknn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
     myknn.fit(D, L)
-
     #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myknn, D, L, cv=cv)
     #Accuracy for Kfold, scores.mean()
     print scores, scores.mean()
-
     print 'Done!'
     return myknn
 
+def trainRFClassifier(D, L):
+    # Train a RandomForest classifier
+    print 'Training the RandomForest classifier...'
+    myRF = RandomForestRegressor(max_depth=2, random_state=0)
+    for i in range(0, L.shape[0]):
+        L[i] = GetKey(L[i])
+    myRF.fit(D, L)
+    #scores = np.mean(cross_val_score(myRF, D, L, cv=10))
+    #print scores
+    print 'Done!'
+    return myRF
 
-def predictAndTest( myknn,Test_descriptors,Test_label_per_descriptor):
+
+
+def predictAndTest( classifier,descriptors,label_per_descriptor):
     # get all the test data and predict their labels
 
     numtestimages = 0
     numcorrect = 0
     PredictList = []
 
-    for i in range(len(Test_descriptors)):
-        predictions = myknn.predict(Test_descriptors[i].reshape(1, -1))
+    for i in range(len(descriptors)):
+        predictions    = classifier.predict(descriptors[i].reshape(1, -1))
         values, counts = np.unique(predictions, return_counts=True)
         predictedclass = values[np.argmax(counts)]
         #print 'image ' + test_images_filenames[i] + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass
         numtestimages += 1
         PredictList.append(predictedclass)
-        if predictedclass == Test_label_per_descriptor[i]:
+        if predictedclass == label_per_descriptor[i]:
             numcorrect += 1
     npPredictList = np.array(PredictList)
     return numcorrect * 100.0 / numtestimages,npPredictList
@@ -179,12 +192,6 @@ def evaluation(L,kPredictions):
     plt.title('Precision/Recall curve')
     plt.show()
 
-    #ROC CURVE
-    #CREATE LABEL LIST
-
-    #VALUES FOR EACH LABEL
-
-    #fpr, tpr, thresholds = metrics.roc_curve(, , pos_label=2)
 
 def rocCurve():
     #ROC CURVE
@@ -253,16 +260,20 @@ def __main__():
     kVector=np.arange(2,9,1)
     kPredictions = []
     Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
-    for k in kVector:
-        myknn = trainClassifier(D, L, k)
-        accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
+    if classifier == "KNN":
+        for k in kVector:
+            myknn = trainKNNClassifier(D, L, k)
+            accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
+            kPredictions.append(PredictList)
+            print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
+            evaluation(L,kPredictions)
+    elif classifier == "RandomForest":
+        myRF = trainRFClassifier(D, L)
+        accuracy,PredictList = predictAndTest(myRF,Test_descriptors,Test_label_per_descriptor)
         kPredictions.append(PredictList)
-        print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
-
-    evaluation(L,kPredictions)
-    #print 'Final accuracy: ' + str(accuracy)
-
+        print ('RandomForest accuracy is ' + str(accuracy))
     end = time.time()
     print 'Done in ' + str(end - start) + ' secs.'
+
 
 __main__()

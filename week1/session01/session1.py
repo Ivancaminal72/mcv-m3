@@ -51,9 +51,31 @@ def SIFTfeatures(filenames,labels):
             label_per_descriptor.append(labels[i])
     return descriptors,label_per_descriptor
 
-def featureExtraction(train_images_filenames, train_labels):
+def histfeatures(filenames,labels):
+    descriptors = []
+    label_per_descriptor = []
 
-    Train_descriptors, Train_label_per_descriptor = SIFTfeatures(train_images_filenames, train_labels)
+    for i in range(len(filenames)):
+        filename = filenames[i]
+        if label_per_descriptor.count(labels[i]) < 30:
+            # print 'Reading image ' + filename
+            ima = cv2.imread(filename)
+            gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
+            hist, bin_edges = np.histogram(gray,10)
+            descriptors.append(hist)
+            label_per_descriptor.append(labels[i])
+    return descriptors,label_per_descriptor
+
+def featureExtraction(train_images_filenames, train_labels,features):
+    Train_descriptors=[]
+    Train_label_per_descriptor=[]
+    if features == "SIFT":
+        Train_descriptors, Train_label_per_descriptor = SIFTfeatures(train_images_filenames, train_labels)
+    elif features == "hist":
+        Train_descriptors, Train_label_per_descriptor = histfeatures(train_images_filenames, train_labels)
+    else:
+        print('feature specified not found')
+        exit(-1)
     print 'Features extracted'
     # Transform everything to numpy arrays
 
@@ -186,18 +208,22 @@ def rocCurve():
     plt.show()
 
 def __main__():
+    features = "SIFT" #SIFT/hist
     start = time.time()
     train_images_filenames, test_images_filenames, train_labels, test_labels = inputImagesLabels()
-    D,L = featureExtraction(train_images_filenames, train_labels)
+    D,L = featureExtraction(train_images_filenames, train_labels,features)
 
     kVector=np.arange(2,9,1)
     kPredictions = []
-
-    # if features.contains("SIFT"):
-    Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
-    # if features.contains("hist"):
-    # use hist
-
+    Test_descriptors=[]
+    Test_label_per_descriptor=[]
+    if features == "SIFT":
+        Test_descriptors, Test_label_per_descriptor = SIFTfeatures(test_images_filenames, test_labels)
+    elif features == "hist":
+        Test_descriptors, Test_label_per_descriptor = histfeatures(test_images_filenames, test_labels)
+    else:
+        print('feature specified not found')
+        exit(-1)
     for k in kVector:
         myknn = trainClassifier(D, L, k)
         accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)

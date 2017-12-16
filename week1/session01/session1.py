@@ -18,7 +18,7 @@ from sklearn.metrics import roc_curve, auc
 
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "KNN"  #KNN/RF/GNB
+Globalclassifier   = "KNN"  #KNN/RF/GNB/LG
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -49,43 +49,6 @@ def inputImagesLabels():
     # print 'Loaded ' + str(len(train_images_filenames)) + ' training images filenames with classes ', set(train_labels)
     # print 'Loaded ' + str(len(test_images_filenames)) + ' testing images filenames with classes ', set(test_labels)
     return train_images_filenames, test_images_filenames, train_labels, test_labels
-
-def SIFTfeatures(filenames,labels):
-    descriptors = []
-    label_per_descriptor = []
-
-    for i in range(len(filenames)):
-        filename = filenames[i]
-        if label_per_descriptor.count(labels[i]) < loadimages:
-            # print 'Reading image ' + filename
-            ima = cv2.imread(filename)
-            gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
-            SIFTdetector = cv2.SIFT(nfeatures=nfeatures)
-            kpt, des = SIFTdetector.detectAndCompute(gray, None)
-            if agregate_sift_desc:
-                d = np.zeros([1, nfeatures * 128])
-                d[0, 0:des.size] = des[0:nfeatures, 0:128].reshape(1, -1)
-                descriptors.append(list(d))
-            else:
-                descriptors.append(des)
-            label_per_descriptor.append(labels[i])
-
-    return descriptors,label_per_descriptor
-
-def histfeatures(filenames,labels):
-    descriptors = []
-    label_per_descriptor = []
-
-    for i in range(len(filenames)):
-        filename = filenames[i]
-        if label_per_descriptor.count(labels[i]) < loadimages:
-            # print 'Reading image ' + filename
-            ima = cv2.imread(filename)
-            gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
-            hist, bin_edges = np.histogram(gray,10)
-            descriptors.append(hist)
-            label_per_descriptor.append(labels[i])
-    return descriptors,label_per_descriptor
 
 def getImageDescriptors(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -173,6 +136,25 @@ def trainBayesClassifier(D, L,depth=2):
     #printScores(scores)
     return myGNB
 
+def sigmoid(x):
+    return 1.0/(1+np.exp(-x))
+
+def logistic_regression( features, target, steps, alpha ):
+    LRtarget  = []
+    for i in range(len(features)):
+        LRtarget.append( int( GetKey( target[i] ) ) )
+    LRtarget = np.array( LRtarget )
+    weights  = np.zeros( features.shape[1] )
+    m,n   = features.shape
+    y     = LRtarget.reshape( m, 1 )
+    theta = np.ones( shape=( n, 1 ) ) 
+    for step in range( steps ):
+        h = sigmoid( np.dot( features, theta ) )
+        error = ( h - y )
+        gradient = np.dot( features.T , error ) / m
+        theta = theta - alpha * gradient
+    return theta
+
 def predictAndTest( classifier,descriptors,label_per_descriptor):
     # get all the test data and predict their labels
     numtestimages = 0
@@ -195,22 +177,17 @@ def predictAndTest( classifier,descriptors,label_per_descriptor):
     return numcorrect * 100.0 / numtestimages,npPredictList
 
 def evaluation(L,kPredictions):
-
-    #----canviar per precision recall bien hecho
     precision = []
     recall = []
     for p in kPredictions:
         cm = confusion_matrix(L, p)
         precision.append(float(cm[1, 1]) / (cm[1, 1] + cm[0, 1]))
         recall.append(float(cm[1, 1]) / (cm[1, 1] + cm[1, 0]))
-    # ----canviar per precision recall bien hecho
-
     x1 = np.array(precision)
     y1 = np.array(recall)
     plt.plot(x1, y1)  # line plot
     plt.title('Precision/Recall curve')
     plt.show()
-
 
 def rocCurve(descriptors,label_per_descriptor,classifier):
     print "Plotting ROC curve"
@@ -275,11 +252,13 @@ def __main__():
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print 'Bayes accuracy is: ' + str(accuracy)
-    if UseROC == True:
-        rocCurve(Test_descriptors,Test_label_per_descriptor,classifier)
+    elif Globalclassifier == "LG":
+        values = logistic_regression(Test_descriptors,Test_label_per_descriptor,1000,10.5)
+        print 'Logistic regresion values are: ' + str(values)
+    if UseROC == True and Globalclassifier != "LG":
+        rocCurve(D,L,classifier)
 
     end = time.time()
     print 'Done in ' + str(end - start) + ' secs.'
-
 
 __main__()

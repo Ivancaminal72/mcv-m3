@@ -14,7 +14,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import label_binarize
 from sklearn.cross_validation import train_test_split
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, f1_score
 
 
 features           = "SIFT" #SIFT/hist
@@ -98,7 +98,7 @@ def featureExtraction(filenames, labels):
 
 def printScores(scores):
     print scores
-    print scores.mean()
+    print 'Acuracy for Kfold: ' + str(scores.mean())
     print 'Done!'
 
 def trainKNNClassifier(D, L, k=5):
@@ -227,10 +227,13 @@ def rocCurve(descriptors,label_per_descriptor,classifier):
         plt.legend(loc="lower right")
         plt.show()
 
-def evaluation(D, L, classifier, kPredictions):
+def evaluation(D, L, predictList, kPredictions, classifier):
+    #Weighted average of the F1 score of each class
+    print 'F1 Score: '+ str(f1_score(L, predictList, average='macro'))
+
     print 'Evaluating the classifier...'
-    #PRECISION / RECALL curve
     if len(kPredictions) != 0:
+        # PRECISION / RECALL curve
         prCurve(L, kPredictions)
 
     #ROC curve
@@ -243,14 +246,21 @@ def __main__():
     D,L = featureExtraction(train_images_filenames, train_labels)
 
     kVector=np.arange(2,9,1)
+    kaccuracy = np.zeros(len(kVector))
     kPredictions = []
     Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
     if Globalclassifier == "KNN":
-        for k in kVector:
+        for idx, k in enumerate(kVector):
             classifier = trainKNNClassifier(D, L, k)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
+            kaccuracy[idx] = accuracy
             print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
+
+        #Recompute the best classifier (based on accuracy)
+        classifier = trainKNNClassifier(D, L, kVector[np.argmax(kaccuracy)])
+        accuracy, PredictList = predictAndTest(classifier, Test_descriptors, Test_label_per_descriptor)
+
     elif Globalclassifier == "RF":
             classifier = trainRFClassifier(D, L)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
@@ -266,7 +276,7 @@ def __main__():
         print 'Logistic regresion values are: ' + str(values)
 
     #Perform evaluation
-    evaluation(D, L, classifier, kPredictions)
+    evaluation(D, L, PredictList, kPredictions, classifier)
 
     end = time.time()
     print "Finished"

@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import ShuffleSplit
 
 features           = "SIFT" #SIFT/hist
-classifier         = "KNN"
+Globalclassifier   = "KNN"
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -128,6 +128,9 @@ def featureExtraction(filenames, labels):
             L = np.hstack((L, np.array(label_per_descriptor[i])))
     return D, L
 
+def printScores(Scrores):
+    print scores, scores.mean()
+    print 'Done!'
 
 def trainKNNClassifier(D, L, k=5):
     # Train a k-nn classifier
@@ -138,20 +141,21 @@ def trainKNNClassifier(D, L, k=5):
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myknn, D, L, cv=cv)
     #Accuracy for Kfold, scores.mean()
-    print scores, scores.mean()
-    print 'Done!'
+    print(scores)
     return myknn
 
-def trainRFClassifier(D, L):
+def trainRFClassifier(D, L,depth=2):
     # Train a RandomForest classifier
     print 'Training the RandomForest classifier...'
-    myRF = RandomForestRegressor(max_depth=2, random_state=0)
+    myRF = RandomForestRegressor(max_depth=depth, random_state=0)
+    LRF  = []
     for i in range(0, L.shape[0]):
-        L[i] = GetKey(L[i])
-    myRF.fit(D, L)
-    #scores = np.mean(cross_val_score(myRF, D, L, cv=10))
-    #print scores
-    print 'Done!'
+        LRF.append(int(GetKey(L[i])))
+    LRF = np.array(LRF)
+    myRF.fit(D, LRF)
+    cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
+    scores = cross_val_score(myRF, D, LRF, cv=cv)
+    #printScores(scores)
     return myRF
 
 
@@ -170,7 +174,10 @@ def predictAndTest( classifier,descriptors,label_per_descriptor):
         #print 'image ' + test_images_filenames[i] + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass
         numtestimages += 1
         PredictList.append(predictedclass)
-        if predictedclass == label_per_descriptor[i]:
+        if Globalclassifier == "RandomForest":
+            if round(predictedclass) == int(GetKey(label_per_descriptor[i])):
+                numcorrect += 1
+        elif predictedclass == label_per_descriptor[i]:
             numcorrect += 1
     npPredictList = np.array(PredictList)
     return numcorrect * 100.0 / numtestimages,npPredictList
@@ -260,18 +267,18 @@ def __main__():
     kVector=np.arange(2,9,1)
     kPredictions = []
     Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
-    if classifier == "KNN":
+    if Globalclassifier == "KNN":
         for k in kVector:
             myknn = trainKNNClassifier(D, L, k)
             accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
             evaluation(L,kPredictions)
-    elif classifier == "RandomForest":
-        myRF = trainRFClassifier(D, L)
-        accuracy,PredictList = predictAndTest(myRF,Test_descriptors,Test_label_per_descriptor)
-        kPredictions.append(PredictList)
-        print ('RandomForest accuracy is ' + str(accuracy))
+    elif Globalclassifier == "RandomForest":
+            myRF = trainRFClassifier(D, L)
+            accuracy,PredictList = predictAndTest(myRF,Test_descriptors,Test_label_per_descriptor)
+            kPredictions.append(PredictList)
+            print 'RandomForest accuracy is: ' + str(accuracy)
     end = time.time()
     print 'Done in ' + str(end - start) + ' secs.'
 

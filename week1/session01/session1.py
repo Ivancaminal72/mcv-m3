@@ -10,9 +10,10 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import ShuffleSplit
+from sklearn.naive_bayes import GaussianNB
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "KNN"
+Globalclassifier   = "GNB"  #KNN/RandomForest/GNB
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -158,6 +159,16 @@ def trainRFClassifier(D, L,depth=2):
     #printScores(scores)
     return myRF
 
+def trainBayesClassifier(D, L,depth=2):
+    # Train a RandomForest classifier
+    print 'Training the Bayes classifier...'
+    myGNB = GaussianNB()
+    myGNB.fit(D,L)
+    cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
+    scores = cross_val_score(myGNB, D, L, cv=cv)
+    #printScores(scores)
+    return myGNB
+
 
 
 def predictAndTest( classifier,descriptors,label_per_descriptor):
@@ -279,6 +290,12 @@ def __main__():
             accuracy,PredictList = predictAndTest(myRF,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print 'RandomForest accuracy is: ' + str(accuracy)
+    elif Globalclassifier == "GNB":
+            myGNB = trainBayesClassifier(D, L)
+            accuracy,PredictList = predictAndTest(myGNB,Test_descriptors,Test_label_per_descriptor)
+            kPredictions.append(PredictList)
+            print 'Bayes accuracy is: ' + str(accuracy)
+
     end = time.time()
     print 'Done in ' + str(end - start) + ' secs.'
 

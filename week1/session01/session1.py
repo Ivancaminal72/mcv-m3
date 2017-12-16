@@ -11,12 +11,18 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import ShuffleSplit
 from sklearn.naive_bayes import GaussianNB
+from sklearn.preprocessing import label_binarize
+from sklearn.cross_validation import train_test_split
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import roc_curve, auc
+
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "GNB"  #KNN/RandomForest/GNB
+Globalclassifier   = "KNN"  #KNN/RF/GNB
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
+UseROC             = True   #True/False
 
 def GetKey(Label):
     switcher = {
@@ -97,8 +103,6 @@ def getImageDescriptors(image):
 
         return des
 
-
-
 def featureExtraction(filenames, labels):
     descriptors = []
     label_per_descriptor = []
@@ -169,11 +173,8 @@ def trainBayesClassifier(D, L,depth=2):
     #printScores(scores)
     return myGNB
 
-
-
 def predictAndTest( classifier,descriptors,label_per_descriptor):
     # get all the test data and predict their labels
-
     numtestimages = 0
     numcorrect = 0
     PredictList = []
@@ -211,8 +212,22 @@ def evaluation(L,kPredictions):
     plt.show()
 
 
-def rocCurve():
-    #ROC CURVE
+def rocCurve(descriptors,label_per_descriptor,classifier):
+    print "Plotting ROC curve"
+    tprs = []
+    aucs = []
+    LROC  = []
+    for i in range(len(descriptors)):
+        LROC.append(int(GetKey(label_per_descriptor[i])))
+    LROC = np.array(LROC)
+    #Binarize to convert in one vs all
+    LROC = label_binarize(LROC, classes=[0,1,2,3,4,5,6,7])
+    # shuffle and split training and test sets
+    X_train, X_test, y_train, y_test =\
+    train_test_split(descriptors, LROC, test_size=0.125, random_state=0)
+    # classifier
+    clf = OneVsRestClassifier(classifier)
+    y_score = clf.fit(X_train, y_train).predict_proba(X_test)
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
@@ -221,54 +236,19 @@ def rocCurve():
         fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    # Compute micro-average ROC curve and ROC area
-    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_score.ravel())
-    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-    # Plot ROC curves for the multiclass problem
-
-    # Compute macro-average ROC curve and ROC area
-
-    # First aggregate all false positive rates
-    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
-
-    # Then interpolate all ROC curves at this points
-    mean_tpr = np.zeros_like(all_fpr)
-    for i in range(n_classes):
-        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
-
-    # Finally average it and compute AUC
-    mean_tpr /= n_classes
-
-    fpr["macro"] = all_fpr
-    tpr["macro"] = mean_tpr
-    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
-
-    # Plot all ROC curves
-    plt.figure()
-    plt.plot(fpr["micro"], tpr["micro"],
-             label='micro-average ROC curve (area = {0:0.2f})'
-                   ''.format(roc_auc["micro"]),
-             color='deeppink', linestyle=':', linewidth=4)
-
-    plt.plot(fpr["macro"], tpr["macro"],
-             label='macro-average ROC curve (area = {0:0.2f})'
-                   ''.format(roc_auc["macro"]),
-             color='navy', linestyle=':', linewidth=4)
-
-    colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
-    for i, color in zip(range(n_classes), colors):
-        plt.plot(fpr[i], tpr[i], color=color, lw=lw,
-                 label='ROC curve of class {0} (area = {1:0.2f})'
-                 ''.format(i, roc_auc[i]))
-
-    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Some extension of Receiver operating characteristic to multi-class')
-    plt.legend(loc="lower right")
-    plt.show()
+    # Plot of a ROC curve for a specific class
+    for i in range(8):
+        plt.figure()
+        plt.plot(fpr[i], tpr[i], label='ROC curve (area = %0.2f)' % roc_auc[i])
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic example')
+        plt.legend(loc="lower right")
+        plt.show()
+    print "finished"
 
 def __main__():
     start = time.time()
@@ -280,21 +260,23 @@ def __main__():
     Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
     if Globalclassifier == "KNN":
         for k in kVector:
-            myknn = trainKNNClassifier(D, L, k)
-            accuracy,PredictList = predictAndTest(myknn,Test_descriptors,Test_label_per_descriptor)
+            classifier = trainKNNClassifier(D, L, k)
+            accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
             evaluation(L,kPredictions)
-    elif Globalclassifier == "RandomForest":
-            myRF = trainRFClassifier(D, L)
-            accuracy,PredictList = predictAndTest(myRF,Test_descriptors,Test_label_per_descriptor)
+    elif Globalclassifier == "RF":
+            classifier = trainRFClassifier(D, L)
+            accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print 'RandomForest accuracy is: ' + str(accuracy)
     elif Globalclassifier == "GNB":
-            myGNB = trainBayesClassifier(D, L)
-            accuracy,PredictList = predictAndTest(myGNB,Test_descriptors,Test_label_per_descriptor)
+            classifier = trainBayesClassifier(D, L)
+            accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print 'Bayes accuracy is: ' + str(accuracy)
+    if UseROC == True:
+        rocCurve(Test_descriptors,Test_label_per_descriptor,classifier)
 
     end = time.time()
     print 'Done in ' + str(end - start) + ' secs.'

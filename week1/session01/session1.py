@@ -96,8 +96,9 @@ def featureExtraction(filenames, labels):
             L = np.hstack((L, np.array(label_per_descriptor[i])))
     return D, L
 
-def printScores(Scrores):
-    print scores, scores.mean()
+def printScores(scores):
+    print scores
+    print scores.mean()
     print 'Done!'
 
 def trainKNNClassifier(D, L, k=5):
@@ -108,8 +109,7 @@ def trainKNNClassifier(D, L, k=5):
     #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myknn, D, L, cv=cv)
-    #Accuracy for Kfold, scores.mean()
-    print(scores)
+    printScores(scores)
     return myknn
 
 def trainRFClassifier(D, L,depth=2):
@@ -123,7 +123,7 @@ def trainRFClassifier(D, L,depth=2):
     myRF.fit(D, LRF)
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myRF, D, LRF, cv=cv)
-    #printScores(scores)
+    printScores(scores)
     return myRF
 
 def trainBayesClassifier(D, L,depth=2):
@@ -133,7 +133,7 @@ def trainBayesClassifier(D, L,depth=2):
     myGNB.fit(D,L)
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myGNB, D, L, cv=cv)
-    #printScores(scores)
+    printScores(scores)
     return myGNB
 
 def sigmoid(x):
@@ -176,7 +176,8 @@ def predictAndTest( classifier,descriptors,label_per_descriptor):
     npPredictList = np.array(PredictList)
     return numcorrect * 100.0 / numtestimages,npPredictList
 
-def evaluation(L,kPredictions):
+def prCurve(L, kPredictions):
+    print "Plotting Precision/Recall curve"
     precision = []
     recall = []
     for p in kPredictions:
@@ -225,7 +226,16 @@ def rocCurve(descriptors,label_per_descriptor,classifier):
         plt.title('Receiver operating characteristic example')
         plt.legend(loc="lower right")
         plt.show()
-    print "finished"
+
+def evaluation(D, L, classifier, kPredictions):
+    print 'Evaluating the classifier...'
+    #PRECISION / RECALL curve
+    if len(kPredictions) != 0:
+        prCurve(L, kPredictions)
+
+    #ROC curve
+    if UseROC == True and Globalclassifier != "LG":
+        rocCurve(D,L,classifier)
 
 def __main__():
     start = time.time()
@@ -241,11 +251,10 @@ def __main__():
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
-            evaluation(L,kPredictions)
     elif Globalclassifier == "RF":
             classifier = trainRFClassifier(D, L)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
-            kPredictions.append(PredictList)
+            #kPredictions.append(PredictList)
             print 'RandomForest accuracy is: ' + str(accuracy)
     elif Globalclassifier == "GNB":
             classifier = trainBayesClassifier(D, L)
@@ -255,10 +264,12 @@ def __main__():
     elif Globalclassifier == "LG":
         values = logistic_regression(Test_descriptors,Test_label_per_descriptor,1000,10.5)
         print 'Logistic regresion values are: ' + str(values)
-    if UseROC == True and Globalclassifier != "LG":
-        rocCurve(D,L,classifier)
+
+    #Perform evaluation
+    evaluation(D, L, classifier, kPredictions)
 
     end = time.time()
+    print "Finished"
     print 'Done in ' + str(end - start) + ' secs.'
 
 __main__()

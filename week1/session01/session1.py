@@ -8,7 +8,7 @@ from sklearn.metrics import roc_curve
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import ShuffleSplit
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import label_binarize
@@ -18,7 +18,7 @@ from sklearn.metrics import roc_curve, auc, f1_score
 
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "KNN"  #KNN/RF/GNB/LG
+Globalclassifier   = "RF"  #KNN/RF/GNB/LG
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -96,41 +96,38 @@ def featureExtraction(filenames, labels):
             L = np.hstack((L, np.array(label_per_descriptor[i])))
     return D, L
 
-def printScores(scores):
-    print scores
-    print 'Acuracy for Kfold: ' + str(scores.mean())
-    print 'Done!'
+def printScores(scores,K=0):
+    #print scores
+    if K > 0:
+        print 'Acuracy for Kfold with K = ' + str(K) + ' in training: ' + str(scores.mean())
+    else:
+        print 'Acuracy for Kfold in training: ' + str(scores.mean())
 
 def trainKNNClassifier(D, L, k=5):
     # Train a k-nn classifier
-    print 'Training the knn classifier...'
     myknn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
     myknn.fit(D, L)
     #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myknn, D, L, cv=cv)
-    printScores(scores)
+    printScores(scores,k)
     return myknn
 
 def trainRFClassifier(D, L,depth=2):
     # Train a RandomForest classifier
-    print 'Training the RandomForest classifier...'
-    myRF = RandomForestRegressor(max_depth=depth, random_state=0)
-    LRF  = []
-    for i in range(0, L.shape[0]):
-        LRF.append(int(GetKey(L[i])))
-    LRF = np.array(LRF)
-    myRF.fit(D, LRF)
+    myRF = RandomForestClassifier(max_depth=depth, random_state=0)
+    myRF.fit(D, L)
+    #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
-    scores = cross_val_score(myRF, D, LRF, cv=cv)
+    scores = cross_val_score(myRF, D, L, cv=cv)
     printScores(scores)
     return myRF
 
-def trainBayesClassifier(D, L,depth=2):
+def trainBayesClassifier(D, L):
     # Train a RandomForest classifier
-    print 'Training the Bayes classifier...'
     myGNB = GaussianNB()
     myGNB.fit(D,L)
+    #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
     scores = cross_val_score(myGNB, D, L, cv=cv)
     printScores(scores)
@@ -168,8 +165,8 @@ def predictAndTest( classifier,descriptors,label_per_descriptor):
         #print 'image ' + test_images_filenames[i] + ' was from class ' + test_labels[i] + ' and was predicted ' + predictedclass
         numtestimages += 1
         PredictList.append(predictedclass)
-        if Globalclassifier == "RandomForest":
-            if round(predictedclass) == int(GetKey(label_per_descriptor[i])):
+        if Globalclassifier == "RF":
+            if predictedclass == int(GetKey(label_per_descriptor[i])):
                 numcorrect += 1
         elif predictedclass == label_per_descriptor[i]:
             numcorrect += 1
@@ -199,13 +196,14 @@ def rocCurve(descriptors,label_per_descriptor,classifier):
         LROC.append(int(GetKey(label_per_descriptor[i])))
     LROC = np.array(LROC)
     #Binarize to convert in one vs all
-    LROC = label_binarize(LROC, classes=[0,1,2,3,4,5,6,7])
+    LROC = label_binarize(LROC, classes=[1,2,3,4,5,6,7,8])
     # shuffle and split training and test sets
     X_train, X_test, y_train, y_test =\
     train_test_split(descriptors, LROC, test_size=0.125, random_state=0)
     # classifier
     clf = OneVsRestClassifier(classifier)
     y_score = clf.fit(X_train, y_train).predict_proba(X_test)
+    print y_score.mean()
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
@@ -227,14 +225,15 @@ def rocCurve(descriptors,label_per_descriptor,classifier):
         plt.legend(loc="lower right")
         plt.show()
 
-def evaluation(D, L, predictList, kPredictions, classifier):
+def F1_Recall(L,predictList):
     #Weighted average of the F1 score of each class
     print 'F1 Score: '+ str(f1_score(L, predictList, average='macro'))
 
-    print 'Evaluating the classifier...'
-    if len(kPredictions) != 0:
-        # PRECISION / RECALL curve
-        prCurve(L, kPredictions)
+
+def evaluationForOneVsAll(D, L, classifier):
+    print 'Evaluating the classifier for ...'
+    # PRECISION / RECALL curve
+    #prCurve(L, kPredictions)
 
     #ROC curve
     if UseROC == True and Globalclassifier != "LG":
@@ -250,33 +249,47 @@ def __main__():
     kPredictions = []
     Test_descriptors, Test_label_per_descriptor = featureExtraction(test_images_filenames, test_labels)
     if Globalclassifier == "KNN":
+        print 'KNN classifier...'
         for idx, k in enumerate(kVector):
             classifier = trainKNNClassifier(D, L, k)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             kaccuracy[idx] = accuracy
-            print ('for K = '+ str(k) + ' accuracy is ' + str(accuracy))
-
+            print "KNN with K = " + str(k) + " accuracy in test is " + str(accuracy / 100.0)
+            F1_Recall(L,PredictList)
+        print "The best KNN is:"
         #Recompute the best classifier (based on accuracy)
         classifier = trainKNNClassifier(D, L, kVector[np.argmax(kaccuracy)])
         accuracy, PredictList = predictAndTest(classifier, Test_descriptors, Test_label_per_descriptor)
+        print "KNN with K = " + str(k) + " accuracy in test is " + str(accuracy / 100.0)
+        F1_Recall(L,PredictList)
 
     elif Globalclassifier == "RF":
-            classifier = trainRFClassifier(D, L)
+            print "RandomForest classifier..."
+            LRF  = []
+            for i in range(0, L.shape[0]):
+                LRF.append(int(GetKey(L[i])))
+            LRF = np.array(LRF)
+            L = LRF
+            classifier = trainRFClassifier(D,L)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
+            F1_Recall(L,PredictList)
             #kPredictions.append(PredictList)
-            print 'RandomForest accuracy is: ' + str(accuracy)
+            print "RandomForest accuracy in test is: " + str(accuracy / 100.0)
     elif Globalclassifier == "GNB":
+            print "Bayes classifier..."
             classifier = trainBayesClassifier(D, L)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
-            print 'Bayes accuracy is: ' + str(accuracy)
+            print "Bayes accuracy in test is: " + str(accuracy / 100.0)
+            F1_Recall(L,PredictList)
     elif Globalclassifier == "LG":
+        print "Logistic regresion classifier..."
         values = logistic_regression(Test_descriptors,Test_label_per_descriptor,1000,10.5)
-        print 'Logistic regresion values are: ' + str(values)
+        print "Logistic regresion values are: " + str(values)
 
-    #Perform evaluation
-    evaluation(D, L, PredictList, kPredictions, classifier)
+    #Evaluation for One Vs All
+    evaluationForOneVsAll(D, L, PredictList, kPredictions, classifier)
 
     end = time.time()
     print "Finished"

@@ -23,7 +23,7 @@ from sklearn.cross_validation import train_test_split
 
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "KNN"  #KNN/RF/GNB/LG
+Globalclassifier   = "RF"  #KNN/RF/GNB/LG
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -138,25 +138,6 @@ def trainBayesClassifier(D, L):
     printScores(scores)
     return myGNB
 
-def sigmoid(x):
-    return 1.0/(1+np.exp(-x))
-
-def logistic_regression( features, target, steps, alpha ):
-    LRtarget  = []
-    for i in range(len(features)):
-        LRtarget.append( int( GetKey( target[i] ) ) )
-    LRtarget = np.array( LRtarget )
-    weights  = np.zeros( features.shape[1] )
-    m,n   = features.shape
-    y     = LRtarget.reshape( m, 1 )
-    theta = np.ones( shape=( n, 1 ) ) 
-    for step in range( steps ):
-        h = sigmoid( np.dot( features, theta ) )
-        error = ( h - y )
-        gradient = np.dot( features.T , error ) / m
-        theta = theta - alpha * gradient
-    return theta
-
 def predictAndTest( classifier,descriptors,label_per_descriptor):
     # get all the test data and predict their labels
     numtestimages = 0
@@ -193,18 +174,17 @@ def ROCAndPRCurves(descriptors,label_per_descriptor,classifier):
     train_test_split(descriptors, LROC, test_size=0.125, random_state=0)
     # classifier
     clf = OneVsRestClassifier(classifier)
-    scores = clf.fit(X_train, y_train).predict_proba(X_test)
-    printScores(scores)
+    probabilities = clf.fit(X_train, y_train).predict_proba(X_test)
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
     for i in range(8):
-        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], scores[:, i])
+        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], probabilities[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
     # Compute micro-average ROC curve and ROC area
-    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), scores.ravel())
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), probabilities.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
     # First aggregate all false positive rates
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(8)]))
@@ -255,13 +235,13 @@ def ROCAndPRCurves(descriptors,label_per_descriptor,classifier):
     average_precision = dict()
     for i in range(8):
         precision[i], recall[i], _ = precision_recall_curve(y_test[:, i],
-                                                            scores[:, i])
-        average_precision[i] = average_precision_score(y_test[:, i], scores[:, i])
+                                                            probabilities[:, i])
+        average_precision[i] = average_precision_score(y_test[:, i], probabilities[:, i])
 
     # A "micro-average": quantifying score on all classes jointly
     precision["micro"], recall["micro"], _ = precision_recall_curve(y_test.ravel(),
-        scores.ravel())
-    average_precision["micro"] = average_precision_score(y_test, scores,
+        probabilities.ravel())
+    average_precision["micro"] = average_precision_score(y_test, probabilities,
                                                          average="micro")
     print('Average precision score, micro-averaged over all classes: {0:0.2f}'
           .format(average_precision["micro"]))
@@ -298,11 +278,9 @@ def ROCAndPRCurves(descriptors,label_per_descriptor,classifier):
     plt.legend(lines, labels, loc=(0, -.38), prop=dict(size=14))
     plt.show()
 
-
 def F1_Score(L,predictList):
     #Weighted average of the F1 score of each class
     return f1_score(L, predictList, average='macro')
-
 
 def evaluationForOneVsAll(D, L, classifier,Test_descriptors,Test_label_per_descriptor):
     print 'Evaluating the classifier for OneVsAll...'
@@ -311,6 +289,43 @@ def evaluationForOneVsAll(D, L, classifier,Test_descriptors,Test_label_per_descr
     accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
     print "Accuracy in test is: " + str(accuracy / 100.0)
     print 'F1 Score: '+  str(F1_Score(L,PredictList))
+
+class LogisticRegression(object):
+    def __init__(self, eta=0.1, n_iter=50):
+        self.eta = eta
+        self.n_iter = n_iter
+
+    def fit(self, X, y):
+        X = np.insert(X, 0, 1, axis=1)
+        self.w = []
+        m = X.shape[0]
+
+        for i in np.unique(y):
+            y_copy = np.where(y == i, 1, 0)
+            w = np.ones(X.shape[1])
+
+            for _ in range(self.n_iter):
+                output = X.dot(w)
+                errors = y_copy - self.m_sigmoid(output)
+                w += self.eta / m * errors.dot(X)
+            self.w.append((w, i))
+        return self
+
+    def predict(self, X):
+        output = np.insert(X, 0, 1, axis=1).dot(self.w)
+        return (np.floor(self.m_sigmoid(output) + .5)).astype(int)
+
+    def score(self, X, y):
+        return sum(self.predict(X) == y) / len(y)
+
+    def m_sigmoid(self,x):
+        return 1.0/(1+np.exp(-x))
+
+    def m_predict_one(self, x):
+        return max((x.dot(w), c) for w, c in self.w)[1]
+
+    def predict(self, X):
+        return [self.m_predict_one(i) for i in np.insert(X, 0, 1, axis=1)]
 
 def __main__():
     start = time.time()
@@ -337,28 +352,29 @@ def __main__():
         print "KNN with K = " + str(kVector[np.argmax(kaccuracy)]) + " accuracy in test is " + str(accuracy / 100.0)
         print 'F1 Score: '+  str(F1_Score(L,PredictList))
     elif Globalclassifier == "RF":
-            print "RandomForest classifier..."
-            LRF  = []
-            for i in range(0, L.shape[0]):
-                LRF.append(int(GetKey(L[i])))
-            LRF = np.array(LRF)
-            L = LRF
-            classifier = trainRFClassifier(D,L)
-            accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
-            kPredictions.append(PredictList)
-            print 'F1 Score: '+  str(F1_Score(L,PredictList))
-            print "RandomForest accuracy in test is: " + str(accuracy / 100.0)
+        print "RandomForest classifier..."
+        LRF  = []
+        for i in range(0, L.shape[0]):
+            LRF.append(int(GetKey(L[i])))
+        LRF = np.array(LRF)
+        L = LRF
+        classifier = trainRFClassifier(D,L)
+        accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
+        kPredictions.append(PredictList)
+        print 'F1 Score: '+  str(F1_Score(L,PredictList))
+        print "RandomForest accuracy in test is: " + str(accuracy / 100.0)
     elif Globalclassifier == "GNB":
-            print "Bayes classifier..."
-            classifier = trainBayesClassifier(D, L)
-            accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
-            kPredictions.append(PredictList)
-            print "Bayes accuracy in test is: " + str(accuracy / 100.0)
-            print 'F1 Score: '+  str(F1_Score(L,PredictList))
+        print "Bayes classifier..."
+        classifier = trainBayesClassifier(D, L)
+        accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
+        kPredictions.append(PredictList)
+        print "Bayes accuracy in test is: " + str(accuracy / 100.0)
+        print 'F1 Score: '+  str(F1_Score(L,PredictList))
     elif Globalclassifier == "LG":
         print "Logistic regresion classifier..."
-        values = logistic_regression(Test_descriptors,Test_label_per_descriptor,1000,10.5)
-        print "Logistic regresion values are: " + str(values)
+        classifier = LogisticRegression(n_iter=1000).fit(D, L)
+        print(classifier.score(D, L))
+        print(classifier.score(Test_descriptors, Test_label_per_descriptor))
 
     #Evaluation for One Vs All
     if evaluationOVsAll == True and Globalclassifier != "LG":

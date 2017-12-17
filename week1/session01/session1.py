@@ -1,28 +1,33 @@
 import cv2
-import numpy as np
-import cPickle
 import time
+import cPickle
+import numpy as np
+from scipy import interp
+from itertools import cycle
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_curve
-from sklearn.model_selection import cross_val_score
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import label_binarize
+from sklearn.model_selection import ShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import precision_recall_curve
+from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import ShuffleSplit
-from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import label_binarize
-from sklearn.cross_validation import train_test_split
-from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics import average_precision_score
 from sklearn.metrics import roc_curve, auc, f1_score
+from sklearn.cross_validation import train_test_split
+
 
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "RF"  #KNN/RF/GNB/LG
+Globalclassifier   = "KNN"  #KNN/RF/GNB/LG
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
-UseROC             = True   #True/False
+evaluationOVsAll   = True   #True/False
 
 def GetKey(Label):
     switcher = {
@@ -173,21 +178,7 @@ def predictAndTest( classifier,descriptors,label_per_descriptor):
     npPredictList = np.array(PredictList)
     return numcorrect * 100.0 / numtestimages,npPredictList
 
-def prCurve(L, kPredictions):
-    print "Plotting Precision/Recall curve"
-    precision = []
-    recall = []
-    for p in kPredictions:
-        cm = confusion_matrix(L, p)
-        precision.append(float(cm[1, 1]) / (cm[1, 1] + cm[0, 1]))
-        recall.append(float(cm[1, 1]) / (cm[1, 1] + cm[1, 0]))
-    x1 = np.array(precision)
-    y1 = np.array(recall)
-    plt.plot(x1, y1)  # line plot
-    plt.title('Precision/Recall curve')
-    plt.show()
-
-def rocCurve(descriptors,label_per_descriptor,classifier):
+def ROCAndPRCurves(descriptors,label_per_descriptor,classifier):
     print "Plotting ROC curve"
     tprs = []
     aucs = []
@@ -202,42 +193,124 @@ def rocCurve(descriptors,label_per_descriptor,classifier):
     train_test_split(descriptors, LROC, test_size=0.125, random_state=0)
     # classifier
     clf = OneVsRestClassifier(classifier)
-    y_score = clf.fit(X_train, y_train).predict_proba(X_test)
-    print y_score.mean()
+    scores = clf.fit(X_train, y_train).predict_proba(X_test)
+    printScores(scores)
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
     for i in range(8):
-        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
+        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], scores[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-    # Plot of a ROC curve for a specific class
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), scores.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    # First aggregate all false positive rates
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(8)]))
+
+    # Then interpolate all ROC curves at this points
+    mean_tpr = np.zeros_like(all_fpr)
     for i in range(8):
-        plt.figure()
-        plt.plot(fpr[i], tpr[i], label='ROC curve (area = %0.2f)' % roc_auc[i])
-        plt.plot([0, 1], [0, 1], 'k--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic example')
-        plt.legend(loc="lower right")
-        plt.show()
+        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
 
-def F1_Recall(L,predictList):
+    # Finally average it and compute AUC
+    mean_tpr /= 8
+
+    fpr["macro"] = all_fpr
+    tpr["macro"] = mean_tpr
+    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    # Plot all ROC curves
+    plt.figure()
+    plt.plot(fpr["micro"], tpr["micro"],
+             label='micro-average ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["micro"]),
+             color='deeppink', linestyle=':', linewidth=4)
+
+    plt.plot(fpr["macro"], tpr["macro"],
+             label='macro-average ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["macro"]),
+             color='navy', linestyle=':', linewidth=4)
+
+    colors = cycle(['aqua', 'darkorange', 'cornflowerblue','r', 'g', 'b', 'y','m'])
+    for i, color in zip(range(8), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=2,
+                 label='ROC curve of class {0} (area = {1:0.2f})'
+                 ''.format(i, roc_auc[i]))
+
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic curve')
+    plt.legend(loc="lower right")
+    plt.show()
+
+    print "Plotting Precision/Recall curve"
+    # Compute PR curve for each class
+    # For each class
+    precision = dict()
+    recall = dict()
+    average_precision = dict()
+    for i in range(8):
+        precision[i], recall[i], _ = precision_recall_curve(y_test[:, i],
+                                                            scores[:, i])
+        average_precision[i] = average_precision_score(y_test[:, i], scores[:, i])
+
+    # A "micro-average": quantifying score on all classes jointly
+    precision["micro"], recall["micro"], _ = precision_recall_curve(y_test.ravel(),
+        scores.ravel())
+    average_precision["micro"] = average_precision_score(y_test, scores,
+                                                         average="micro")
+    print('Average precision score, micro-averaged over all classes: {0:0.2f}'
+          .format(average_precision["micro"]))
+    plt.figure(figsize=(7, 8))
+    f_scores = np.linspace(0.2, 0.8, num=4)
+    lines = []
+    labels = []
+    for f_score in f_scores:
+        x = np.linspace(0.01, 1)
+        y = f_score * x / (2 * x - f_score)
+        l, = plt.plot(x[y >= 0], y[y >= 0], color='gray', alpha=0.2)
+        plt.annotate('f1={0:0.1f}'.format(f_score), xy=(0.9, y[45] + 0.02))
+
+    lines.append(l)
+    labels.append('iso-f1 curves')
+    l, = plt.plot(recall["micro"], precision["micro"], color='gold', lw=2)
+    lines.append(l)
+    labels.append('micro-average Precision-recall (area = {0:0.2f})'
+                  ''.format(average_precision["micro"]))
+
+    for i, color in zip(range(8), colors):
+        l, = plt.plot(recall[i], precision[i], color=color, lw=2)
+        lines.append(l)
+        labels.append('Precision-recall for class {0} (area = {1:0.2f})'
+                      ''.format(i, average_precision[i]))
+
+    fig = plt.gcf()
+    fig.subplots_adjust(bottom=0.25)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall curve')
+    plt.legend(lines, labels, loc=(0, -.38), prop=dict(size=14))
+    plt.show()
+
+
+def F1_Score(L,predictList):
     #Weighted average of the F1 score of each class
-    print 'F1 Score: '+ str(f1_score(L, predictList, average='macro'))
+    return f1_score(L, predictList, average='macro')
 
 
-def evaluationForOneVsAll(D, L, classifier):
-    print 'Evaluating the classifier for ...'
-    # PRECISION / RECALL curve
-    #prCurve(L, kPredictions)
-
+def evaluationForOneVsAll(D, L, classifier,Test_descriptors,Test_label_per_descriptor):
+    print 'Evaluating the classifier for OneVsAll...'
     #ROC curve
-    if UseROC == True and Globalclassifier != "LG":
-        rocCurve(D,L,classifier)
+    ROCAndPRCurves(D,L,classifier)
+    accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
+    print "Accuracy in test is: " + str(accuracy / 100.0)
+    print 'F1 Score: '+  str(F1_Score(L,PredictList))
 
 def __main__():
     start = time.time()
@@ -256,14 +329,13 @@ def __main__():
             kPredictions.append(PredictList)
             kaccuracy[idx] = accuracy
             print "KNN with K = " + str(k) + " accuracy in test is " + str(accuracy / 100.0)
-            F1_Recall(L,PredictList)
+            print 'F1 Score: '+  str(F1_Score(L,PredictList))
         print "The best KNN is:"
         #Recompute the best classifier (based on accuracy)
         classifier = trainKNNClassifier(D, L, kVector[np.argmax(kaccuracy)])
         accuracy, PredictList = predictAndTest(classifier, Test_descriptors, Test_label_per_descriptor)
-        print "KNN with K = " + str(k) + " accuracy in test is " + str(accuracy / 100.0)
-        F1_Recall(L,PredictList)
-
+        print "KNN with K = " + str(kVector[np.argmax(kaccuracy)]) + " accuracy in test is " + str(accuracy / 100.0)
+        print 'F1 Score: '+  str(F1_Score(L,PredictList))
     elif Globalclassifier == "RF":
             print "RandomForest classifier..."
             LRF  = []
@@ -273,8 +345,8 @@ def __main__():
             L = LRF
             classifier = trainRFClassifier(D,L)
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
-            F1_Recall(L,PredictList)
-            #kPredictions.append(PredictList)
+            kPredictions.append(PredictList)
+            print 'F1 Score: '+  str(F1_Score(L,PredictList))
             print "RandomForest accuracy in test is: " + str(accuracy / 100.0)
     elif Globalclassifier == "GNB":
             print "Bayes classifier..."
@@ -282,15 +354,15 @@ def __main__():
             accuracy,PredictList = predictAndTest(classifier,Test_descriptors,Test_label_per_descriptor)
             kPredictions.append(PredictList)
             print "Bayes accuracy in test is: " + str(accuracy / 100.0)
-            F1_Recall(L,PredictList)
+            print 'F1 Score: '+  str(F1_Score(L,PredictList))
     elif Globalclassifier == "LG":
         print "Logistic regresion classifier..."
         values = logistic_regression(Test_descriptors,Test_label_per_descriptor,1000,10.5)
         print "Logistic regresion values are: " + str(values)
 
     #Evaluation for One Vs All
-    evaluationForOneVsAll(D, L, PredictList, kPredictions, classifier)
-
+    if evaluationOVsAll == True and Globalclassifier != "LG":
+        evaluationForOneVsAll(D, L,classifier,Test_descriptors,Test_label_per_descriptor)
     end = time.time()
     print "Finished"
     print 'Done in ' + str(end - start) + ' secs.'

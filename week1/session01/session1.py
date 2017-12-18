@@ -23,7 +23,7 @@ from sklearn.cross_validation import train_test_split
 
 
 features           = "SIFT" #SIFT/hist
-Globalclassifier   = "RF"  #KNN/RF/GNB/LG
+Globalclassifier   = "KNN"  #KNN/RF/GNB/LG
 agregate_sift_desc = True
 nfeatures          = 100
 loadimages         = 30
@@ -118,9 +118,9 @@ def trainKNNClassifier(D, L, k=5):
     printScores(scores,k)
     return myknn
 
-def trainRFClassifier(D, L,depth=2):
+def trainRFClassifier(D, L):
     # Train a RandomForest classifier
-    myRF = RandomForestClassifier(max_depth=depth, random_state=0)
+    myRF = RandomForestClassifier()
     myRF.fit(D, L)
     #VALIDATION: Kfold cross validation
     cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)

@@ -7,6 +7,7 @@ from sklearn import svm
 from sklearn import cluster
 # import matplotlib.pyplot as plt
 
+SIFTTYPE = "DSIFT"
 
 def inputImagesLabels():
     # read the train and test files
@@ -32,11 +33,18 @@ def SIFTextraction(filenames,labels=[]):
         print 'Reading image ' + filename
         ima = cv2.imread(filename)
         gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
-        kpt, des = SIFTdetector.detectAndCompute(gray, None)
+        #SIFT DETECTOR
+        if SIFTTYPE == "DSIFT":
+        	kpt, des = SIFTdetector.detectAndCompute(gray, None)
+        #DENSE SIFT DETECTOR
+        elif SIFTTYPE == "DSIFT":
+	    	dense  = cv2.FeatureDetector_create("Dense")
+	    	kp=dense.detect(gray)
+	        kp,des=sift.compute(imgGray,kp)
         descriptors.append(des)
         if len(labels)!=0:
             label_per_descriptor.append(labels[i])
-        print str(len(kpt)) + ' extracted keypoints and descriptors'
+        print str(len(kpt)) + ' extracted keypoints and descriptors with ' + SIFTTYPE
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]

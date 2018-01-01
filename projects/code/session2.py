@@ -40,7 +40,7 @@ def SIFTextraction(filenames,labels=[]):
         elif SIFTTYPE == "DSIFT":
 	    	dense  = cv2.FeatureDetector_create("Dense")
 	    	kp=dense.detect(gray)
-	        kp,des=sift.compute(imgGray,kp)
+	        kp,des=sift.compute(gray,kp)
         descriptors.append(des)
         if len(labels)!=0:
             label_per_descriptor.append(labels[i])

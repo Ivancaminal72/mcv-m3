@@ -34,13 +34,13 @@ def SIFTextraction(filenames,labels=[]):
         ima = cv2.imread(filename)
         gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
         #SIFT DETECTOR
-        if SIFTTYPE == "DSIFT":
+        if SIFTTYPE == "SIFT":
         	kpt, des = SIFTdetector.detectAndCompute(gray, None)
         #DENSE SIFT DETECTOR
         elif SIFTTYPE == "DSIFT":
 	    	dense  = cv2.FeatureDetector_create("Dense")
 	    	kp=dense.detect(gray)
-	        kp,des=sift.compute(gray,kp)
+	        kpt,des=SIFTdetector.compute(gray,kp)
         descriptors.append(des)
         if len(labels)!=0:
             label_per_descriptor.append(labels[i])

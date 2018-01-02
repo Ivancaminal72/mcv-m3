@@ -35,12 +35,12 @@ def SIFTextraction(filenames,labels=[]):
         gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
         #SIFT DETECTOR
         if SIFTTYPE == "SIFT":
-        	kpt, des = SIFTdetector.detectAndCompute(gray, None)
+            kpt, des = SIFTdetector.detectAndCompute(gray, None)
         #DENSE SIFT DETECTOR
         elif SIFTTYPE == "DSIFT":
-	    	dense  = cv2.FeatureDetector_create("Dense")
-	    	kp=dense.detect(gray)
-	        kpt,des=SIFTdetector.compute(gray,kp)
+            dense  = cv2.FeatureDetector_create("Dense")
+            kp=dense.detect(gray)
+            kpt,des=SIFTdetector.compute(gray,kp)
         descriptors.append(des)
         if len(labels)!=0:
             label_per_descriptor.append(labels[i])
@@ -79,7 +79,7 @@ def getWords(codebook,descriptors,k=512):
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
 
-    return words,visual_words
+    return visual_words
 
 
 def trainSVM(visual_words,train_labels):
@@ -111,10 +111,10 @@ def __main__():
     D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, train_labels) #get SIFT descriptors for train set
     k = 512
     codebook=computeCodebook(D,k) #create codebook using train SIFT descriptors
-    train_words, train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
+    train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
     clf,stdSlr=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
     D, test_descriptors, foo=SIFTextraction(test_images_filenames) #get SIFT descriptors for test set
-    test_words, test_visual_words=getWords(codebook,test_descriptors) #words found at test set
+    test_visual_words=getWords(codebook,test_descriptors) #words found at test set
     evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels)
 
     end = time.time()

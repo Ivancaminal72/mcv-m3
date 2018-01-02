@@ -3,11 +3,14 @@ import numpy as np
 import cPickle
 import time
 from sklearn.preprocessing import StandardScaler
-from sklearn import svm
+from sklearn.model_selection import GridSearchCV
+from sklearn import svm, grid_search
 from sklearn import cluster
 # import matplotlib.pyplot as plt
 
-SIFTTYPE = "DSIFT"
+SIFTTYPE = "DSIFT" #DSIFT,SIFT
+USECV    = True    #True, False
+KERNEL   = 'rbf'   #'rbf','poly' and 'sigmoid'
 
 def inputImagesLabels():
     # read the train and test files
@@ -81,6 +84,13 @@ def getWords(codebook,descriptors,k=512):
 
     return visual_words
 
+def svc_param_selection(D_scaled, train_labels,C,gamma, nfolds=4):
+    param_grid = {'C': C, 'gamma' : gamma}
+    clf = GridSearchCV(svm.SVC(kernel=KERNEL), param_grid, cv=nfolds)
+    clf.fit(D_scaled, train_labels)
+    print clf.best_params_
+    return clf
+
 
 def trainSVM(visual_words,train_labels):
     # Train an SVM classifier with RBF kernel
@@ -88,7 +98,12 @@ def trainSVM(visual_words,train_labels):
     init = time.time()
     stdSlr = StandardScaler().fit(visual_words)
     D_scaled = stdSlr.transform(visual_words)
-    clf = svm.SVC(kernel='rbf', C=1, gamma=.002).fit(D_scaled, train_labels)
+    if USECV:
+        Cs = [0.001, 0.01, 0.1, 1, 10]
+        gammas = [0.002,0.001, 0.01, 0.1, 1]
+        clf = svc_param_selection(D_scaled,train_labels,Cs,gammas)
+    else:
+        clf = svm.SVC(kernel='rbf', C=1, gamma=.002).fit(D_scaled, train_labels)
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
     return clf,stdSlr

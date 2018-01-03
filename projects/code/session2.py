@@ -8,8 +8,8 @@ from sklearn import svm, grid_search
 from sklearn import cluster
 # import matplotlib.pyplot as plt
 
-SIFTTYPE = "DSIFT" #DSIFT,SIFT
-USECV    = True    #True, False
+SIFTTYPE = "SIFT" #DSIFT,SIFT
+USECV    = False    #True, False
 KERNEL   = 'rbf'   #'rbf','poly' and 'sigmoid'
 
 def inputImagesLabels():
@@ -112,7 +112,8 @@ def trainSVM(visual_words,train_labels):
         gammas = [0.002,0.001, 0.01, 0.1, 1]
         clf = svc_param_selection(D_scaled,train_labels,Cs,gammas)
     else:
-        clf = svm.SVC(kernel='rbf', C=1, gamma=.002).fit(D_scaled, train_labels)
+        clf = svm.SVC(kernel='rbf', C=10, gamma=.002).fit(D_scaled, train_labels) #Best params for SIFT
+        #clf = svm.SVC(kernel='rbf', C=?, gamma=?).fit(D_scaled, train_labels)  # Best params for DSIFT
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
     return clf,stdSlr

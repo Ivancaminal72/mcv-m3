@@ -91,6 +91,15 @@ def svc_param_selection(D_scaled, train_labels,C,gamma, nfolds=4):
     print clf.best_params_
     return clf
 
+def histogramIntersection(M, N):
+    N = np.transpose(N)
+    K_int = np.zeros((M.shape[0], N.shape[1]), dtype=int)
+
+    for y in range(M.shape[0]):
+        for x in range(N.shape[1]):
+            K_int[y, x] = np.sum(np.minimum(M[y, :], N[:, x]))
+
+    return K_int
 
 def trainSVM(visual_words,train_labels):
     # Train an SVM classifier with RBF kernel

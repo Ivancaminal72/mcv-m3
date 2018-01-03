@@ -84,7 +84,7 @@ def SIFTextraction(filenames, labels=[], train=True):
 
 
 def spatialPyramids(gray, SIFTdetector, levels=3):
-    descriptors = np.array([])
+    descriptors = []
     m,n = gray.shape
     for level in range(1, levels):
         step_m=np.round(m/level)
@@ -93,16 +93,23 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
         vec_m.append(m)
         vec_n=range(0,n,step_n)
         vec_n.append(n)
-        for idx in range(0,len(vec_m)-2):
+        for idx in range(0,len(vec_m)):
+            if idx + 1 > len(vec_m) -1:
+                break
             cell = gray[vec_m[idx]:vec_m[idx+1], vec_n[idx]:vec_n[idx+1]]
             kpt, des = SIFTdetector.detectAndCompute(cell, None)
-            des = np.array(des)
-            if len(descriptors) == 0:
-                descriptors = des
+            try:
+                des
+            except NameError:
+                des = None
+            if des is None:
+                continue
             else:
-                descriptors = np.vstack((descriptors, des))
-
-    return descriptors
+                for i in des:
+                    descriptors.append(i)
+        vec_m = []
+        vec_n = []
+    return np.array(descriptors)
 
 
 def computeCodebook(D,k=512):

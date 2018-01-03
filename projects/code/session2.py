@@ -6,7 +6,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from sklearn import svm, grid_search
 from sklearn import cluster
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from sklearn.metrics import make_scorer
+from sklearn.metrics import accuracy_score
 
 SIFTTYPE = "spatialPyramids" #DSIFT,SIFT,spatialPyramids
 USECV    = False    #True, False
@@ -134,7 +136,7 @@ def svc_param_selection(D_scaled, train_labels,C,gamma, nfolds=4):
     param_grid = {'C': C, 'gamma' : gamma}
     clf = GridSearchCV(svm.SVC(kernel=KERNEL), param_grid, cv=nfolds)
     clf.fit(D_scaled, train_labels)
-    print clf.best_params_
+    print clf.best_params_ 
     return clf
 
 def histogramIntersection(M, N):
@@ -147,6 +149,22 @@ def histogramIntersection(M, N):
 
     return K_int
 
+def ShowGraphic(results,C_range,gamma_range):
+    # We extract just the scores
+    scores = [x[1] for x in results]
+    scores = np.array(scores).reshape(len(C_range), len(gamma_range))
+
+    # Make a nice figure
+    plt.figure(figsize=(8, 6))
+    plt.subplots_adjust(left=0.15, right=0.95, bottom=0.15, top=0.95)
+    plt.imshow(scores, interpolation='nearest', cmap=plt.cm.spectral)
+    plt.xlabel('gamma')
+    plt.ylabel('C')
+    plt.colorbar()
+    plt.xticks(np.arange(len(gamma_range)), gamma_range, rotation=45)
+    plt.yticks(np.arange(len(C_range)), C_range)
+    plt.show()
+
 def trainSVM(visual_words,train_labels):
     # Train an SVM classifier with RBF kernel
     print 'Training the SVM classifier...'
@@ -154,9 +172,16 @@ def trainSVM(visual_words,train_labels):
     stdSlr = StandardScaler().fit(visual_words)
     D_scaled = stdSlr.transform(visual_words)
     if USECV:
-        Cs = [0.001, 0.01, 0.1, 1, 10]
-        gammas = [0.002,0.001, 0.01, 0.1, 1]
+        #Cs = [0.001, 0.01, 0.1, 1, 10, 100]
+        #gammas = [0.002,0.001, 0.01, 0.1, 1, 10]
+        Cs     = 10. ** np.arange(-3, 8)
+        gammas = 10. ** np.arange(-5, 4)
         clf = svc_param_selection(D_scaled,train_labels,Cs,gammas)
+        means = clf.cv_results_['mean_test_score']
+        stds = clf.cv_results_['std_test_score']
+        print means, stds
+        print clf.cv_results_['params']
+        ShowGraphic(clf.grid_scores_,Cs,gammas)
     else:
         clf = svm.SVC(kernel='rbf', C=10, gamma=.002).fit(D_scaled, train_labels) #Best params for SIFT
         #clf = svm.SVC(kernel='rbf', C=?, gamma=?).fit(D_scaled, train_labels)  # Best params for DSIFT

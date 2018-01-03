@@ -8,7 +8,7 @@ from sklearn import svm, grid_search
 from sklearn import cluster
 # import matplotlib.pyplot as plt
 
-SIFTTYPE = "SIFT" #DSIFT,SIFT
+SIFTTYPE = "spatialPyramids" #DSIFT,SIFT,spatialPyramids
 USECV    = False    #True, False
 KERNEL   = 'rbf'   #'rbf','poly' and 'sigmoid'
 
@@ -56,6 +56,52 @@ def SIFTextraction(filenames,labels=[]):
     for i in range(len(descriptors)):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
         startingpoint += len(descriptors[i])
+    return D,descriptors,label_per_descriptor
+
+
+def spatialPyramids(filenames,labels=[],flag=1,l=3):
+    # create the SIFT detector object
+    SIFTdetector = cv2.SIFT(nfeatures=300)
+
+    # extract SIFT keypoints and descriptors
+    # store descriptors in a python list of numpy arrays
+    descriptors = []
+    label_per_descriptor = []
+    for i in range(len(filenames)):
+        filename = filenames[i]
+        print 'Reading image ' + filename
+        ima = cv2.imread(filename)
+        gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
+        # SIFT DETECTOR
+        m,n = gray.shape
+        for j in range(1,l):
+            step_m=np.round(m/l)
+            step_n=np.round(n/l)
+            vec_m=range(0,m,step_m)
+            vec_m.append(m)
+            vec_n=range(0,n,step_n)
+            vec_n.append(n)
+            for idx in range(0,len(vec_m)-2):
+                cell = gray[vec_m[idx]:vec_m[idx+1], vec_n[idx]:vec_n[idx+1]]
+                kpt, des = SIFTdetector.detectAndCompute(gray, None)
+                descriptors.append(des)
+                if len(labels) != 0:
+                    label_per_descriptor.append(labels[i])
+        print ' extracted keypoints and descriptors with all grids '
+
+    size_descriptors = descriptors[0].shape[1]
+    D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
+    startingpoint = 0
+    for i in range(len(descriptors)):
+        D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
+        startingpoint += len(descriptors[i])
+    if flag==1:
+        cPickle.dump(descriptors, open("train_descriptors.dat", "wb"))
+        cPickle.dump(D, open("D.dat", "wb"))
+        cPickle.dump(label_per_descriptor, open("label_per_descriptor.dat", "wb"))
+    else:
+        cPickle.dump(descriptors, open("test_descriptors.dat", "wb"))
+
     return D,descriptors,label_per_descriptor
 
 
@@ -133,12 +179,18 @@ def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, train_labels) #get SIFT descriptors for train set
+    if SIFTTYPE == "spatialPyramids":
+        D, train_descriptors, label_per_descriptor=spatialPyramids(train_images_filenames, train_labels) #get SIFT descriptors for train set
+    else:
+        D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, train_labels) #get SIFT descriptors for train set
     k = 512
     codebook=computeCodebook(D,k) #create codebook using train SIFT descriptors
     train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
     clf,stdSlr=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
-    D, test_descriptors, foo=SIFTextraction(test_images_filenames) #get SIFT descriptors for test set
+    if SIFTTYPE == "spatialPyramids":
+        D, test_descriptors, foo=spatialPyramids(test_images_filenames,2) #get SIFT descriptors for test set
+    else:
+        D, test_descriptors, foo=SIFTextraction(test_images_filenames) #get SIFT descriptors for test set
     test_visual_words=getWords(codebook,test_descriptors) #words found at test set
     evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels)
 

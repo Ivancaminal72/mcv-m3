@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import make_scorer
 from sklearn.metrics import accuracy_score
 
-SIFTTYPE = "spatialPyramids" #DSIFT,SIFT,spatialPyramids
+SIFTTYPE = "DSIFT" #DSIFT,SIFT,spatialPyramids
 USECV    = False    #True, False
 KERNEL   = 'rbf'   #'rbf','poly' and 'sigmoid'
 
@@ -68,8 +68,8 @@ def SIFTextraction(filenames, dataset, labels=[]):
             print str(des.shape[0]) + ' extracted descriptors with ' + SIFTTYPE
 
         #Save descriptors & labels
-        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE +"_" + dataset + "_train_descriptors.dat", "wb"))
-        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE +"_" + dataset + "_train_label_per_descriptor.dat", "wb"))
+        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_train_descriptors.dat", "wb"))
+        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_train_label_per_descriptor.dat", "wb"))
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]
@@ -113,7 +113,7 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
 
 def computeCodebook(D,k=512):
     try:
-        codebook = cPickle.load(open("./data_s2/"+ str(k) + "_codebook.dat", "rb"))
+        codebook = cPickle.load(open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "rb"))
     except(IOError, EOFError):
         # compute the codebook
         print 'Computing kmeans with ' + str(k) + ' centroids'
@@ -121,7 +121,7 @@ def computeCodebook(D,k=512):
         codebook = cluster.MiniBatchKMeans(n_clusters=k, verbose=False, batch_size=k * 20, compute_labels=False,
                                            reassignment_ratio=10 ** -4, random_state=42)
         codebook.fit(D)
-        cPickle.dump(codebook, open("./data_s2/"+ str(k) + "_codebook.dat", "wb"))
+        cPickle.dump(codebook, open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
     return codebook

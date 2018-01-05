@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import cPickle
 import time
+import os
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from sklearn import svm, grid_search
@@ -28,17 +29,18 @@ def inputImagesLabels():
 def SIFTextraction(filenames, labels=[], train=True):
     descriptors = []
     label_per_descriptor = []
-    D = np.array([])
     des = np.array([])
     try:
+        if not os.path.exists("./data_s2"):
+            os.makedirs("./data_s2")
         if train:
-            descriptors = cPickle.load(open(SIFTTYPE + "_train_descriptors.dat", "rb"))
-            D = cPickle.load(open(SIFTTYPE + "_D.dat", "rb"))
-            label_per_descriptor = cPickle.load(open(SIFTTYPE + "_label_per_descriptor.dat", "rb"))
+            descriptors = cPickle.load(open("./data_s2/"+SIFTTYPE + "_train_descriptors.dat", "rb"))
+            label_per_descriptor = cPickle.load(open("./data_s2/"+SIFTTYPE + "_label_per_descriptor.dat", "rb"))
+            print "descriptors loaded!"
         else:
-            cPickle.load(open(SIFTTYPE + "_test_descriptors.dat", "wb"))
+            cPickle.load(open("./data_s2/"+SIFTTYPE + "_test_descriptors.dat", "wb"))
 
-    except (OSError, IOError) as e:
+    except (OSError, IOError):
         # create the SIFT detector object
         SIFTdetector = cv2.SIFT(nfeatures=300)
 
@@ -66,19 +68,19 @@ def SIFTextraction(filenames, labels=[], train=True):
                 label_per_descriptor.append(labels[i])
             print str(des.shape[0]) + ' extracted descriptors with ' + SIFTTYPE
 
-        # Transform everything to numpy arrays
-        size_descriptors = descriptors[0].shape[1]
-        D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
-        startingpoint = 0
-        for i in range(len(descriptors)):
-            D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
-            startingpoint += len(descriptors[i])
         if train:
-            cPickle.dump(descriptors, open(SIFTTYPE+"_train_descriptors.dat", "wb"))
-            cPickle.dump(D, open(SIFTTYPE+"_D.dat", "wb"))
-            cPickle.dump(label_per_descriptor, open(SIFTTYPE+"_label_per_descriptor.dat", "wb"))
+            cPickle.dump(descriptors, open("./data_s2/"+SIFTTYPE+"_train_descriptors.dat", "wb"))
+            cPickle.dump(label_per_descriptor, open("./data_s2/"+SIFTTYPE+"_label_per_descriptor.dat", "wb"))
         else:
-            cPickle.dump(descriptors, open(SIFTTYPE+"_test_descriptors.dat", "wb"))
+            cPickle.dump(descriptors, open("./data_s2/"+SIFTTYPE+"_test_descriptors.dat", "wb"))
+
+    # Transform everything to numpy arrays
+    size_descriptors = descriptors[0].shape[1]
+    D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
+    startingpoint = 0
+    for i in range(len(descriptors)):
+        D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
+        startingpoint += len(descriptors[i])
 
     return D,descriptors,label_per_descriptor
 
@@ -113,15 +115,18 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
 
 
 def computeCodebook(D,k=512):
-    # compute the codebook
-    print 'Computing kmeans with ' + str(k) + ' centroids'
-    init = time.time()
-    codebook = cluster.MiniBatchKMeans(n_clusters=k, verbose=False, batch_size=k * 20, compute_labels=False,
-                                       reassignment_ratio=10 ** -4, random_state=42)
-    codebook.fit(D)
-    cPickle.dump(codebook, open("codebook.dat", "wb"))
-    end = time.time()
-    print 'Done in ' + str(end - init) + ' secs.'
+    try:
+        codebook = cPickle.load(open("./data_s2/"+ str(k) + "_codebook.dat", "rb"))
+    except(IOError, EOFError):
+        # compute the codebook
+        print 'Computing kmeans with ' + str(k) + ' centroids'
+        init = time.time()
+        codebook = cluster.MiniBatchKMeans(n_clusters=k, verbose=False, batch_size=k * 20, compute_labels=False,
+                                           reassignment_ratio=10 ** -4, random_state=42)
+        codebook.fit(D)
+        cPickle.dump(codebook, open("./data_s2/"+ str(k) + "_codebook.dat", "wb"))
+        end = time.time()
+        print 'Done in ' + str(end - init) + ' secs.'
     return codebook
 
 def getWords(codebook,descriptors,k=512):
@@ -207,7 +212,6 @@ def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels):
 
 def __main__():
     start = time.time()  # global time
-
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
     D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, train_labels) #get SIFT descriptors for train set
     k = 512

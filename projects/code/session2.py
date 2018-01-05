@@ -26,19 +26,18 @@ def inputImagesLabels():
     return train_images_filenames, test_images_filenames, train_labels, test_labels
 
 
-def SIFTextraction(filenames, labels=[], train=True):
+def SIFTextraction(filenames, dataset, labels=[]):
     descriptors = []
     label_per_descriptor = []
     des = np.array([])
     try:
         if not os.path.exists("./data_s2"):
             os.makedirs("./data_s2")
-        if train:
-            descriptors = cPickle.load(open("./data_s2/"+SIFTTYPE + "_train_descriptors.dat", "rb"))
-            label_per_descriptor = cPickle.load(open("./data_s2/"+SIFTTYPE + "_label_per_descriptor.dat", "rb"))
-            print "descriptors loaded!"
-        else:
-            cPickle.load(open("./data_s2/"+SIFTTYPE + "_test_descriptors.dat", "wb"))
+        # Load descriptors & labels
+        descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
+        label_per_descriptor = cPickle.load(open("./data_s2/" + SIFTTYPE +"_" + dataset + "_label_per_descriptor.dat", "rb"))
+
+        print "descriptors loaded!"
 
     except (OSError, IOError):
         # create the SIFT detector object
@@ -68,11 +67,9 @@ def SIFTextraction(filenames, labels=[], train=True):
                 label_per_descriptor.append(labels[i])
             print str(des.shape[0]) + ' extracted descriptors with ' + SIFTTYPE
 
-        if train:
-            cPickle.dump(descriptors, open("./data_s2/"+SIFTTYPE+"_train_descriptors.dat", "wb"))
-            cPickle.dump(label_per_descriptor, open("./data_s2/"+SIFTTYPE+"_label_per_descriptor.dat", "wb"))
-        else:
-            cPickle.dump(descriptors, open("./data_s2/"+SIFTTYPE+"_test_descriptors.dat", "wb"))
+        #Save descriptors & labels
+        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE +"_" + dataset + "_train_descriptors.dat", "wb"))
+        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE +"_" + dataset + "_train_label_per_descriptor.dat", "wb"))
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]
@@ -213,12 +210,12 @@ def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels):
 def __main__():
     start = time.time()  # global time
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, train_labels) #get SIFT descriptors for train set
+    D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
     k = 512
     codebook=computeCodebook(D,k) #create codebook using train SIFT descriptors
     train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
     clf,stdSlr=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
-    D, test_descriptors, foo=SIFTextraction(test_images_filenames, train=False) #get SIFT descriptors for test set
+    D, test_descriptors, foo=SIFTextraction(test_images_filenames, "test") #get SIFT descriptors for test set
     test_visual_words=getWords(codebook,test_descriptors) #words found at test set
     evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels)
 

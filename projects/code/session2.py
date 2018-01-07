@@ -102,14 +102,19 @@ def featureExtraction(filenames, dataset, codebook = None):
             end = time.time()
             print 'Done in ' + str(end - init) + ' secs.'
             print fv
-        if SIFTTYPE != "spatialPyramids" or codebook is not None:
+
             #Save descriptors & labels
-            print "Saving " + dataset + " descriptors..."
             init = time.time()
-            cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+            if SIFTTYPE == "spatialPyramids" or codebook is None:
+                print "Saving SIFT descriptors..."
+                cPickle.dump(descriptors, open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
+            else:
+                print "Saving " + dataset + " descriptors..."
+                cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
             end = time.time()
             print 'Done in ' + str(end - init) + ' secs.'
             print ""
+
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]
@@ -288,9 +293,9 @@ def __main__():
         train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
         test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
 
-    stdSlr = StandardScaler().fit(train_visual_words)
-    D_train = stdSlr.transform(train_visual_words)  # normalize train words
-    D_test = stdSlr.transform(test_visual_words)  # normalize test words
+    stdSlr = StandardScaler().fit(train_visual_words.astype(float))
+    D_train = stdSlr.transform(train_visual_words.astype(float))  # normalize train words
+    D_test = stdSlr.transform(test_visual_words.astype(float))  # normalize test words
     clf = trainSVM(D_train,train_labels) #train SVM with with labeled visual words
     evaluate(clf, D_test,test_labels,D_train) #evaluate performance
 

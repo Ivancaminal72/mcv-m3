@@ -16,7 +16,7 @@ try:
 except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
-SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "SIFT"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
 KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
 k        = 512     #number of visual words
@@ -24,7 +24,7 @@ CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
 levels   = 4     #number of levels for spatial pyramids
 #FISHER VECTORS (Only if you have Yael library installed)
 CODESIZE = 3      #use very short codebooks (32/64)
-FVECTORS = True   #True/False (Only with DSIFT)
+FVECTORS = False   #True/False (Only with DSIFT)
 
 def inputImagesLabels():
     # read the train and test files

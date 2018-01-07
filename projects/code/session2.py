@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import make_scorer
 from sklearn.metrics import accuracy_score
 
-SIFTTYPE = "DSIFT" #DSIFT,SIFT,spatialPyramids
-USECV    = False    #True, False
-KERNEL   = 'rbf'   #'rbf','poly' and 'sigmoid'
+SIFTTYPE = "SIFT"  #DSIFT/SIFT/spatialPyramids
+USECV    = False    #True/False
+KERNEL   = 'rbf'  #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
 
 def inputImagesLabels():
     # read the train and test files
@@ -106,10 +106,7 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
             else:
                 for i in des:
                     descriptors.append(i)
-        vec_m = []
-        vec_n = []
     return np.array(descriptors)
-
 
 def computeCodebook(D,k=512):
     try:
@@ -141,8 +138,13 @@ def getWords(codebook,descriptors,k=512):
 
 def svc_param_selection(D_scaled, train_labels,C,gamma, nfolds=4):
     param_grid = {'C': C, 'gamma' : gamma}
-    clf = GridSearchCV(svm.SVC(kernel=KERNEL), param_grid, cv=nfolds)
-    clf.fit(D_scaled, train_labels)
+    if KERNEL == 'histogramIntersection':
+        kernelMatrix = histogramIntersection(D_scaled, D_scaled)
+        clf = GridSearchCV(svm.SVC(kernel='precomputed'), param_grid, cv=nfolds)
+        clf.fit(kernelMatrix, train_labels)
+    else:
+        clf = GridSearchCV(svm.SVC(kernel=KERNEL), param_grid, cv=nfolds)
+        clf.fit(D_scaled, train_labels)
     print clf.best_params_ 
     return clf
 
@@ -179,8 +181,6 @@ def trainSVM(visual_words,train_labels):
     stdSlr = StandardScaler().fit(visual_words)
     D_scaled = stdSlr.transform(visual_words)
     if USECV:
-        #Cs = [0.001, 0.01, 0.1, 1, 10, 100]
-        #gammas = [0.002,0.001, 0.01, 0.1, 1, 10]
         Cs     = 10. ** np.arange(-3, 8)
         gammas = 10. ** np.arange(-5, 4)
         clf = svc_param_selection(D_scaled,train_labels,Cs,gammas)
@@ -189,19 +189,34 @@ def trainSVM(visual_words,train_labels):
         print means, stds
         print clf.cv_results_['params']
         ShowGraphic(clf.grid_scores_,Cs,gammas)
+    elif KERNEL == 'histogramIntersection':
+        kernelMatrix = histogramIntersection(D_scaled, D_scaled)
+        clf = svm.SVC(kernel='precomputed',C=10, gamma=.002)
+        clf.fit(kernelMatrix, train_labels)
     else:
         clf = svm.SVC(kernel='rbf', C=10, gamma=.002).fit(D_scaled, train_labels) #Best params for SIFT
         #clf = svm.SVC(kernel='rbf', C=?, gamma=?).fit(D_scaled, train_labels)  # Best params for DSIFT
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
-    return clf,stdSlr
+    return clf,stdSlr,D_scaled
 
 
-def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels):
+def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels,D_scaled):
     # Test the classification accuracy
     print 'Testing the SVM classifier...'
     init = time.time()
-    accuracy = 100 * clf.score(stdSlr.transform(visual_words_test), test_labels)
+    if KERNEL == 'histogramIntersection':
+        predictMatrix = histogramIntersection(stdSlr.transform(visual_words_test), D_scaled)
+        SVMpredictions = clf.predict(predictMatrix)
+        predicted =0
+        images = 0
+        for i in xrange(len(SVMpredictions)):
+            images +=1
+            if SVMpredictions[i] == test_labels[i]:
+                predicted +=1
+        accuracy = 100 * predicted / images
+    else:
+        accuracy = 100 * clf.score(stdSlr.transform(visual_words_test), test_labels)
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
     print 'Final accuracy: ' + str(accuracy)
@@ -214,13 +229,12 @@ def __main__():
     k = 512
     codebook=computeCodebook(D,k) #create codebook using train SIFT descriptors
     train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
-    clf,stdSlr=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
+    clf,stdSlr,D_scaled=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
     D, test_descriptors, foo=SIFTextraction(test_images_filenames, "test") #get SIFT descriptors for test set
     test_visual_words=getWords(codebook,test_descriptors) #words found at test set
-    evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels)
+    evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels,D_scaled)
 
     end = time.time()
     print 'Everything done in ' + str(end - start) + ' secs.'
-    ### 69.02%
-
+    
 __main__()

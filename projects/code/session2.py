@@ -5,15 +5,14 @@ import time
 import os
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
-from sklearn import svm, grid_search
+from sklearn import svm
 from sklearn import cluster
 import matplotlib.pyplot as plt
-from sklearn.metrics import make_scorer
-from sklearn.metrics import accuracy_score
 
 SIFTTYPE = "SIFT"  #DSIFT/SIFT/spatialPyramids
 USECV    = False    #True/False
 KERNEL   = 'rbf'  #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
+k = 512 #number of visual words
 
 def inputImagesLabels():
     # read the train and test files
@@ -26,18 +25,22 @@ def inputImagesLabels():
     return train_images_filenames, test_images_filenames, train_labels, test_labels
 
 
-def SIFTextraction(filenames, dataset, labels=[]):
+def featureExtraction(filenames, dataset, labels=[]):
     descriptors = []
     label_per_descriptor = []
     des = np.array([])
     try:
+        print "Loading " + dataset + " descriptors..."
         if not os.path.exists("./data_s2"):
             os.makedirs("./data_s2")
+        init = time.time()
         # Load descriptors & labels
         descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
         label_per_descriptor = cPickle.load(open("./data_s2/" + SIFTTYPE +"_" + dataset + "_label_per_descriptor.dat", "rb"))
+        end = time.time()
 
-        print "descriptors loaded!"
+        print 'Done in ' + str(end - init) + ' secs.'
+        print ""
 
     except (OSError, IOError):
         # create the SIFT detector object
@@ -45,9 +48,10 @@ def SIFTextraction(filenames, dataset, labels=[]):
 
         # extract SIFT keypoints and descriptors
         # store descriptors in a python list of numpy arrays
+        init = time.time()
         for i in range(len(filenames)):
+            print "Extracting " + dataset + " descriptors using " + SIFTTYPE + "... " + str(i) +'/'+ str(len(filenames))
             filename = filenames[i]
-            print 'Reading image ' + filename
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
             #SIFT DETECTOR
@@ -65,19 +69,31 @@ def SIFTextraction(filenames, dataset, labels=[]):
             descriptors.append(des)
             if len(labels)!=0:
                 label_per_descriptor.append(labels[i])
-            print str(des.shape[0]) + ' extracted descriptors with ' + SIFTTYPE
+        end = time.time()
+        print 'Done in ' + str(end - init) + ' secs.'
+        print ""
 
         #Save descriptors & labels
-        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_train_descriptors.dat", "wb"))
-        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_train_label_per_descriptor.dat", "wb"))
+        print "Saving " + dataset + " descriptors..."
+        init = time.time()
+        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_label_per_descriptor.dat", "wb"))
+        end = time.time()
+        print 'Done in ' + str(end - init) + ' secs.'
+        print ""
 
     # Transform everything to numpy arrays
+    print "Transforming " + dataset + " descriptors to numpy arrays..."
+    init = time.time()
     size_descriptors = descriptors[0].shape[1]
     D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
     startingpoint = 0
     for i in range(len(descriptors)):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
         startingpoint += len(descriptors[i])
+    end = time.time()
+    print 'Done in ' + str(end - init) + ' secs.'
+    print ""
 
     return D,descriptors,label_per_descriptor
 
@@ -108,12 +124,17 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
                     descriptors.append(i)
     return np.array(descriptors)
 
-def computeCodebook(D,k=512):
+def computeCodebook(D):
     try:
+        print 'Loading kmeans with ' + str(k) + ' centroids...'
+        init = time.time()
         codebook = cPickle.load(open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "rb"))
+        end = time.time()
+        print 'Done in ' + str(end - init) + ' secs.'
+        print ""
     except(IOError, EOFError):
         # compute the codebook
-        print 'Computing kmeans with ' + str(k) + ' centroids'
+        print 'Computing kmeans with ' + str(k) + ' centroids...'
         init = time.time()
         codebook = cluster.MiniBatchKMeans(n_clusters=k, verbose=False, batch_size=k * 20, compute_labels=False,
                                            reassignment_ratio=10 ** -4, random_state=42)
@@ -121,11 +142,12 @@ def computeCodebook(D,k=512):
         cPickle.dump(codebook, open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
+        print ""
     return codebook
 
-def getWords(codebook,descriptors,k=512):
+def getWords(codebook,descriptors):
     # get train visual word encoding
-    print 'Getting BoVW representation'
+    print 'Getting BoVW representation...'
     init = time.time()
     visual_words = np.zeros((len(descriptors), k), dtype=np.float32)
     for i in xrange(len(descriptors)):
@@ -133,6 +155,7 @@ def getWords(codebook,descriptors,k=512):
         visual_words[i, :] = np.bincount(words, minlength=k)
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
+    print ""
 
     return visual_words
 
@@ -174,12 +197,10 @@ def ShowGraphic(results,C_range,gamma_range):
     plt.yticks(np.arange(len(C_range)), C_range)
     plt.show()
 
-def trainSVM(visual_words,train_labels):
+def trainSVM(D_scaled,train_labels):
     # Train an SVM classifier with RBF kernel
     print 'Training the SVM classifier...'
     init = time.time()
-    stdSlr = StandardScaler().fit(visual_words)
-    D_scaled = stdSlr.transform(visual_words)
     if USECV:
         Cs     = 10. ** np.arange(-3, 8)
         gammas = 10. ** np.arange(-5, 4)
@@ -198,15 +219,16 @@ def trainSVM(visual_words,train_labels):
         #clf = svm.SVC(kernel='rbf', C=?, gamma=?).fit(D_scaled, train_labels)  # Best params for DSIFT
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
-    return clf,stdSlr,D_scaled
+    print ""
+    return clf
 
 
-def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels,D_scaled):
+def evaluate(clf, D_test, test_labels, D_train):
     # Test the classification accuracy
     print 'Testing the SVM classifier...'
     init = time.time()
     if KERNEL == 'histogramIntersection':
-        predictMatrix = histogramIntersection(stdSlr.transform(visual_words_test), D_scaled)
+        predictMatrix = histogramIntersection(D_test, D_train)
         SVMpredictions = clf.predict(predictMatrix)
         predicted =0
         images = 0
@@ -216,23 +238,27 @@ def evaluateAccuracy(clf,stdSlr,visual_words_test,test_labels,D_scaled):
                 predicted +=1
         accuracy = 100 * predicted / images
     else:
-        accuracy = 100 * clf.score(stdSlr.transform(visual_words_test), test_labels)
+        accuracy = 100 * clf.score(D_test, test_labels)
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
-    print 'Final accuracy: ' + str(accuracy)
-    #return accuracy
+    print ""
+    print 'Final accuracy: ' + str(accuracy) + "%"
+    print ""
 
 def __main__():
     start = time.time()  # global time
+
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors, label_per_descriptor=SIFTextraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
-    k = 512
-    codebook=computeCodebook(D,k) #create codebook using train SIFT descriptors
-    train_visual_words=getWords(codebook,train_descriptors,k) #assign descriptors to nearest word(features cluster) in codebook
-    clf,stdSlr,D_scaled=trainSVM(train_visual_words,train_labels) #train SVM with with labeled visual words
-    D, test_descriptors, foo=SIFTextraction(test_images_filenames, "test") #get SIFT descriptors for test set
-    test_visual_words=getWords(codebook,test_descriptors) #words found at test set
-    evaluateAccuracy(clf, stdSlr, test_visual_words,test_labels,D_scaled)
+    D, train_descriptors, label_per_descriptor=featureExtraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
+    D, test_descriptors, foo = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
+    codebook = computeCodebook(D)  # create codebook using train SIFT descriptors
+    train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
+    test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
+    stdSlr = StandardScaler().fit(train_visual_words)
+    D_train = stdSlr.transform(train_visual_words) # normalize train words
+    D_test = stdSlr.transform(test_visual_words) # normalize test words
+    clf = trainSVM(D_train,train_labels) #train SVM with with labeled visual words
+    evaluate(clf, D_test,test_labels,D_train) #evaluate performance
 
     end = time.time()
     print 'Everything done in ' + str(end - start) + ' secs.'

@@ -8,6 +8,9 @@ from sklearn.model_selection import GridSearchCV
 from sklearn import svm
 from sklearn import cluster
 import matplotlib.pyplot as plt
+from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import cross_val_score
+
 try:
     from yael import ynumpy
 except ImportError:
@@ -20,6 +23,7 @@ KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersect
 k        = 512     #number of visual words
 CODESIZE = 32      #use very short codebooks (32/64)
 FVECTORS = False   #True/False (Only with DSIFT)
+CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
 
 def inputImagesLabels():
     # read the train and test files
@@ -251,6 +255,11 @@ def trainSVM(D_scaled,train_labels):
     else:
         clf = svm.SVC(kernel='rbf', C=10, gamma=.002).fit(D_scaled, train_labels) #Best params for SIFT
         #clf = svm.SVC(kernel='rbf', C=?, gamma=?).fit(D_scaled, train_labels)  # Best params for DSIFT
+        if CVSCORES:
+            # VALIDATION: Kfold cross validation
+            cv = ShuffleSplit(n_splits=4, test_size=0.3, random_state=1)
+            scores = cross_val_score(clf, D_scaled, train_labels, cv=cv)
+            print 'Acuracy for Kfold in training: ' + str(scores.mean())
     end = time.time()
     print 'Done in ' + str(end - init) + ' secs.'
     print ""

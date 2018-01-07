@@ -10,7 +10,6 @@ from sklearn import cluster
 import matplotlib.pyplot as plt
 try:
     from yael import ynumpy
-    import json
 except ImportError:
     print "Yael library not found, you can not use FVECTORS variable"
 

@@ -282,8 +282,8 @@ def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D_train, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
-    D_test, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
+    D_train, train_descriptors,fv_train = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
+    D_test, test_descriptors,fv_test = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
     if FVECTORS and SIFTTYPE == "DSIFT":
         train_descriptors = fv_train
         test_descriptors  = fv_test

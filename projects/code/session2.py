@@ -8,11 +8,18 @@ from sklearn.model_selection import GridSearchCV
 from sklearn import svm
 from sklearn import cluster
 import matplotlib.pyplot as plt
+try:
+    from yael import ynumpy
+    import json
+except ImportError:
+    print "Yael library not found, you can not use FVECTORS variable"
 
-SIFTTYPE = "SIFT"  #DSIFT/SIFT/spatialPyramids
-USECV    = False    #True/False
-KERNEL   = 'rbf'  #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
-k = 512 #number of visual words
+SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
+USECV    = False   #True/False
+KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
+k        = 512     #number of visual words
+CODESIZE = 32      #use very short codebooks (32/64)
+FVECTORS = False   #True/False (Only with DSIFT)
 
 def inputImagesLabels():
     # read the train and test files
@@ -24,10 +31,8 @@ def inputImagesLabels():
     print 'Loaded ' + str(len(test_images_filenames)) + ' testing images filenames with classes ', set(test_labels)
     return train_images_filenames, test_images_filenames, train_labels, test_labels
 
-
 def featureExtraction(filenames, dataset, labels=[]):
     descriptors = []
-    label_per_descriptor = []
     des = np.array([])
     try:
         print "Loading " + dataset + " descriptors..."
@@ -36,7 +41,6 @@ def featureExtraction(filenames, dataset, labels=[]):
         init = time.time()
         # Load descriptors & labels
         descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
-        label_per_descriptor = cPickle.load(open("./data_s2/" + SIFTTYPE +"_" + dataset + "_label_per_descriptor.dat", "rb"))
         end = time.time()
 
         print 'Done in ' + str(end - init) + ' secs.'
@@ -67,17 +71,21 @@ def featureExtraction(filenames, dataset, labels=[]):
                 des = spatialPyramids(gray, SIFTdetector, 3)
 
             descriptors.append(des)
-            if len(labels)!=0:
-                label_per_descriptor.append(labels[i])
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
         print ""
-
+        if FVECTORS and SIFTTYPE == "DSIFT":
+            print "Calculating Fisher vectors"
+            init = time.time()
+            gmm = ynumpy.gmm_learn(des, CODESIZE)
+            fv  = ynumpy.fisher(gmm, des, include = ['mu','sigma'])
+            end = time.time()
+            print 'Done in ' + str(end - init) + ' secs.'
+            print fv
         #Save descriptors & labels
         print "Saving " + dataset + " descriptors..."
         init = time.time()
         cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
-        cPickle.dump(label_per_descriptor, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_label_per_descriptor.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
         print ""
@@ -95,7 +103,7 @@ def featureExtraction(filenames, dataset, labels=[]):
     print 'Done in ' + str(end - init) + ' secs.'
     print ""
 
-    return D,descriptors,label_per_descriptor
+    return D,descriptors
 
 
 def spatialPyramids(gray, SIFTdetector, levels=3):
@@ -249,7 +257,7 @@ def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors, label_per_descriptor=featureExtraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
+    D, train_descriptors     =featureExtraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
     D, test_descriptors, foo = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
     codebook = computeCodebook(D)  # create codebook using train SIFT descriptors
     train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook

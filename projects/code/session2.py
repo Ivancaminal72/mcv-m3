@@ -128,30 +128,31 @@ def featureExtraction(filenames, dataset, codebook = None):
 def spatialPyramids(gray, SIFTdetector, codebook, levels=3):
     m,n = gray.shape
     visual_words = np.array([])
-    for level in range(1, levels):
+    for level in range(1, levels+1):
         step_m=int(m/level)
         step_n=int(n/level)
         vec_m=range(0,m+1,step_m)
         vec_n=range(0,n+1,step_n)
-        for idx in range(0,len(vec_m)-1):
-            cell = gray[vec_m[idx]:vec_m[idx+1], vec_n[idx]:vec_n[idx+1]]
-            kpt, des = SIFTdetector.detectAndCompute(cell, None)
-            try:
-                des
-            except NameError:
-                des = None
-            if des is None:
-                vw = np.zeros((1,k))
-                if visual_words.shape[0] == 0:
-                    visual_words = vw
+        for idx1 in range(0,len(vec_m)-1):
+            for idx2 in range(0, len(vec_n) - 1):
+                cell = gray[vec_m[idx1]:vec_m[idx1+1], vec_n[idx2]:vec_n[idx2+1]]
+                kpt, des = SIFTdetector.detectAndCompute(cell, None)
+                try:
+                    des
+                except NameError:
+                    des = None
+                if des is None:
+                    vw = np.zeros((1,k))
+                    if visual_words.shape[0] == 0:
+                        visual_words = vw
+                    else:
+                        visual_words = np.vstack((visual_words, vw))
                 else:
-                    visual_words = np.vstack((visual_words, vw))
-            else:
-                vw = getWords(codebook, [des])
-                if visual_words.shape[0] == 0:
-                    visual_words = vw
-                else:
-                    visual_words = np.vstack((visual_words, vw))
+                    vw = getWords(codebook, [des])
+                    if visual_words.shape[0] == 0:
+                        visual_words = vw
+                    else:
+                        visual_words = np.vstack((visual_words, vw))
 
     return visual_words.reshape(1,-1)
 

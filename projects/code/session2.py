@@ -107,7 +107,7 @@ def featureExtraction(filenames, dataset, codebook = None):
 
         if FVECTORS and SIFTTYPE == "DSIFT":
             # make a big matrix with all image descriptors
-            all_desc = np.vstack(descriptors)
+            all_desc = np.vstack(image_descs)
 
             k = 64
             n_sample = k * 1000

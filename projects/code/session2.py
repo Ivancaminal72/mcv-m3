@@ -19,7 +19,8 @@ except ImportError:
 SIFTTYPE = "spatialPyramids"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
 KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
-k        = 512     #number of visual words
+k        = 64     #number of visual words
+levels   = 4     #number of levels for spatial pyramids
 CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
 #FISHER VECTORS (Only if you have Yael library installed)
 CODESIZE = 32      #use very short codebooks (32/64)
@@ -88,7 +89,7 @@ def featureExtraction(filenames, dataset, codebook = None):
                 kpt,des=SIFTdetector.compute(gray,kp)
             #SPATIAL PYRAMIDS SIFT DETECTOR
             elif SIFTTYPE == "spatialPyramids":
-                des = spatialPyramids(gray, SIFTdetector, codebook, 3)
+                des = spatialPyramids(gray, SIFTdetector, codebook)
             else:
                 raise ValueError('Not valid SIFTTYPE option')
 
@@ -125,7 +126,7 @@ def featureExtraction(filenames, dataset, codebook = None):
     return D,descriptors
 
 
-def spatialPyramids(gray, SIFTdetector, codebook, levels=3):
+def spatialPyramids(gray, SIFTdetector, codebook):
     m,n = gray.shape
     visual_words = np.array([])
     for level in range(1, levels+1):
@@ -282,8 +283,8 @@ def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D_train, train_descriptors,fv_train = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
-    D_test, test_descriptors,fv_test = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
+    D_train, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
+    D_test, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
     if FVECTORS and SIFTTYPE == "DSIFT":
         train_descriptors = fv_train
         test_descriptors  = fv_test

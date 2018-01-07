@@ -135,7 +135,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         # handle images with 0 local descriptor (100 = far away from "normal" images)
         image_fvs[np.isnan(image_fvs)] = 100
         # get the indices of the query images (the subset of images that end in "00")
-        query_imnos = [i for i, name in enumerate(image_names) if name[-2:] == "00"]
+        query_imnos = [i for i, name in enumerate(filenames) if name[-2:] == "00"]
 
         # corresponding descriptors
         D = image_fvs[query_imnos]

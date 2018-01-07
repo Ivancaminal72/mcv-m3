@@ -12,10 +12,11 @@ try:
     from yael import ynumpy
 except ImportError:
     print "Yael library not found, you can not use FVECTORS variable"
+    print ""
 
-SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "spatialPyramids"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
-KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
+KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
 k        = 512     #number of visual words
 CODESIZE = 32      #use very short codebooks (32/64)
 FVECTORS = False   #True/False (Only with DSIFT)
@@ -28,24 +29,39 @@ def inputImagesLabels():
     test_labels = cPickle.load(open('test_labels.dat', 'r'))
     print 'Loaded ' + str(len(train_images_filenames)) + ' training images filenames with classes ', set(train_labels)
     print 'Loaded ' + str(len(test_images_filenames)) + ' testing images filenames with classes ', set(test_labels)
+    print ""
     return train_images_filenames, test_images_filenames, train_labels, test_labels
 
-def featureExtraction(filenames, dataset, labels=[]):
+def featureExtraction(filenames, dataset, codebook = None):
     descriptors = []
     des = np.array([])
     try:
-        print "Loading " + dataset + " descriptors..."
-        if not os.path.exists("./data_s2"):
-            os.makedirs("./data_s2")
-        init = time.time()
-        # Load descriptors & labels
-        descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
-        end = time.time()
+        if SIFTTYPE == "spatialPyramids" and codebook is None:
+            print "Loading SIFT " + dataset + " descritpors (to compute codebook)..."
+            if not os.path.exists("./data_s2"):
+                os.makedirs("./data_s2")
+            init = time.time()
+            # Load descriptors & labels
+            descriptors = cPickle.load(open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "rb"))
+            end = time.time()
+            print 'Done in ' + str(end - init) + ' secs.'
+            print ""
 
-        print 'Done in ' + str(end - init) + ' secs.'
-        print ""
+        elif SIFTTYPE == "spatialPyramids" and codebook is not None:
+            raise Exception('Compute visual words')
+        else:
+            print "Loading " + SIFTTYPE  + dataset + " descriptors..."
+            if not os.path.exists("./data_s2"):
+                os.makedirs("./data_s2")
+            init = time.time()
+            # Load descriptors & labels
+            descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
+            end = time.time()
 
-    except (OSError, IOError):
+            print 'Done in ' + str(end - init) + ' secs.'
+            print ""
+
+    except (OSError, IOError, Exception):
         # create the SIFT detector object
         SIFTdetector = cv2.SIFT(nfeatures=300)
 
@@ -53,12 +69,15 @@ def featureExtraction(filenames, dataset, labels=[]):
         # store descriptors in a python list of numpy arrays
         init = time.time()
         for i in range(len(filenames)):
-            print "Extracting " + dataset + " descriptors using " + SIFTTYPE + "... " + str(i) +'/'+ str(len(filenames))
+            if SIFTTYPE == "spatialPyramids" and codebook is None:
+                print "Extracting " + dataset + " descriptors using SIFT (to compute codebook)... " + str(i) + '/' + str(len(filenames))
+            else:
+                print "Extracting " + dataset + " descriptors using " + SIFTTYPE + "... " + str(i) + '/' + str(len(filenames))
             filename = filenames[i]
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
             #SIFT DETECTOR
-            if SIFTTYPE == "SIFT":
+            if SIFTTYPE == "SIFT" or "spatialPyramids" and codebook is None:
                 kpt, des = SIFTdetector.detectAndCompute(gray, None)
             #DENSE SIFT DETECTOR
             elif SIFTTYPE == "DSIFT":
@@ -67,7 +86,9 @@ def featureExtraction(filenames, dataset, labels=[]):
                 kpt,des=SIFTdetector.compute(gray,kp)
             #SPATIAL PYRAMIDS SIFT DETECTOR
             elif SIFTTYPE == "spatialPyramids":
-                des = spatialPyramids(gray, SIFTdetector, 3)
+                des = spatialPyramids(gray, SIFTdetector, codebook, 3)
+            else:
+                raise ValueError('Not valid SIFTTYPE option')
 
             descriptors.append(des)
         end = time.time()
@@ -81,43 +102,35 @@ def featureExtraction(filenames, dataset, labels=[]):
             end = time.time()
             print 'Done in ' + str(end - init) + ' secs.'
             print fv
-        #Save descriptors & labels
-        print "Saving " + dataset + " descriptors..."
-        init = time.time()
-        cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
-        end = time.time()
-        print 'Done in ' + str(end - init) + ' secs.'
-        print ""
+        if SIFTTYPE != "spatialPyramids" or codebook is not None:
+            #Save descriptors & labels
+            print "Saving " + dataset + " descriptors..."
+            init = time.time()
+            cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+            end = time.time()
+            print 'Done in ' + str(end - init) + ' secs.'
+            print ""
 
     # Transform everything to numpy arrays
-    print "Transforming " + dataset + " descriptors to numpy arrays..."
-    init = time.time()
     size_descriptors = descriptors[0].shape[1]
     D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
     startingpoint = 0
     for i in range(len(descriptors)):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
         startingpoint += len(descriptors[i])
-    end = time.time()
-    print 'Done in ' + str(end - init) + ' secs.'
-    print ""
 
     return D,descriptors
 
 
-def spatialPyramids(gray, SIFTdetector, levels=3):
-    descriptors = []
+def spatialPyramids(gray, SIFTdetector, codebook, levels=3):
     m,n = gray.shape
+    visual_words = np.array([])
     for level in range(1, levels):
-        step_m=np.round(m/level)
-        step_n=np.round(n/level)
-        vec_m=range(0,m,step_m)
-        vec_m.append(m)
-        vec_n=range(0,n,step_n)
-        vec_n.append(n)
-        for idx in range(0,len(vec_m)):
-            if idx + 1 > len(vec_m) -1:
-                break
+        step_m=int(m/level)
+        step_n=int(n/level)
+        vec_m=range(0,m+1,step_m)
+        vec_n=range(0,n+1,step_n)
+        for idx in range(0,len(vec_m)-1):
             cell = gray[vec_m[idx]:vec_m[idx+1], vec_n[idx]:vec_n[idx+1]]
             kpt, des = SIFTdetector.detectAndCompute(cell, None)
             try:
@@ -125,17 +138,28 @@ def spatialPyramids(gray, SIFTdetector, levels=3):
             except NameError:
                 des = None
             if des is None:
-                continue
+                vw = np.zeros((1,k))
+                if visual_words.shape[0] == 0:
+                    visual_words = vw
+                else:
+                    visual_words = np.vstack((visual_words, vw))
             else:
-                for i in des:
-                    descriptors.append(i)
-    return np.array(descriptors)
+                vw = getWords(codebook, [des])
+                if visual_words.shape[0] == 0:
+                    visual_words = vw
+                else:
+                    visual_words = np.vstack((visual_words, vw))
+
+    return visual_words.reshape(1,-1)
 
 def computeCodebook(D):
     try:
         print 'Loading kmeans with ' + str(k) + ' centroids...'
         init = time.time()
-        codebook = cPickle.load(open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "rb"))
+        if SIFTTYPE == "spatialPyramids":
+            codebook = cPickle.load(open("./data_s2/SIFT_" + str(k) + "_codebook.dat", "rb"))
+        else:
+            codebook = cPickle.load(open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "rb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
         print ""
@@ -146,7 +170,10 @@ def computeCodebook(D):
         codebook = cluster.MiniBatchKMeans(n_clusters=k, verbose=False, batch_size=k * 20, compute_labels=False,
                                            reassignment_ratio=10 ** -4, random_state=42)
         codebook.fit(D)
-        cPickle.dump(codebook, open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "wb"))
+        if SIFTTYPE == "spatialPyramids":
+            cPickle.dump(codebook, open("./data_s2/SIFT_" + str(k) + "_codebook.dat", "wb"))
+        else:
+            cPickle.dump(codebook, open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.'
         print ""
@@ -154,15 +181,10 @@ def computeCodebook(D):
 
 def getWords(codebook,descriptors):
     # get train visual word encoding
-    print 'Getting BoVW representation...'
-    init = time.time()
-    visual_words = np.zeros((len(descriptors), k), dtype=np.float32)
+    visual_words = np.zeros((len(descriptors), k), dtype=np.uint8)
     for i in xrange(len(descriptors)):
         words = codebook.predict(descriptors[i])
         visual_words[i, :] = np.bincount(words, minlength=k)
-    end = time.time()
-    print 'Done in ' + str(end - init) + ' secs.'
-    print ""
 
     return visual_words
 
@@ -256,14 +278,19 @@ def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors     =featureExtraction(train_images_filenames, "train", train_labels) #get SIFT descriptors for train set
-    D, test_descriptors, foo = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
+    D, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
+    D, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
     codebook = computeCodebook(D)  # create codebook using train SIFT descriptors
-    train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
-    test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
+    if SIFTTYPE == "spatialPyramids":
+        train_visual_words, train_descriptors = featureExtraction(train_images_filenames, "train", codebook)  # get SIFT descriptors for train set
+        test_visual_words, test_descriptors = featureExtraction(test_images_filenames, "test", codebook)  # get SIFT descriptors for test set
+    else:
+        train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
+        test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
+
     stdSlr = StandardScaler().fit(train_visual_words)
-    D_train = stdSlr.transform(train_visual_words) # normalize train words
-    D_test = stdSlr.transform(test_visual_words) # normalize test words
+    D_train = stdSlr.transform(train_visual_words)  # normalize train words
+    D_test = stdSlr.transform(test_visual_words)  # normalize test words
     clf = trainSVM(D_train,train_labels) #train SVM with with labeled visual words
     evaluate(clf, D_test,test_labels,D_train) #evaluate performance
 

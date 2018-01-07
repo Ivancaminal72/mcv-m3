@@ -56,7 +56,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             raise Exception('Compute visual words')
         elif FVECTORS and SIFTTYPE == "DSIFT":
             print "Loading DSIFT with FV" + dataset + " descritpors (to compute codebook)..."
-            D = cPickle.load(open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "rb"))
+            image_fvs   = cPickle.load(open("./data_s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "rb"))
             descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
         else:
             print "Loading " + SIFTTYPE  + " " + dataset + " descriptors..."
@@ -75,6 +75,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         # extract SIFT keypoints and descriptors
         # store descriptors in a python list of numpy arrays
         init = time.time()
+        image_descs = []
         for i in range(len(filenames)):
             if SIFTTYPE == "spatialPyramids" and codebook is None:
                 print "Extracting " + dataset + " descriptors using SIFT (to compute codebook)... " + str(i) + '/' + str(len(filenames))
@@ -88,26 +89,65 @@ def featureExtraction(filenames, dataset, codebook = None):
                 kpt, des = SIFTdetector.detectAndCompute(gray, None)
             #DENSE SIFT DETECTOR
             elif SIFTTYPE == "DSIFT":
-                dense  = cv2.FeatureDetector_create("Dense")
-                kp=dense.detect(gray)
-                kpt,des=SIFTdetector.compute(gray,kp)
+                if FVECTORS:
+                    desc, meta = ynumpy.siftgeo_read(filename)
+                    if desc.size == 0: desc = np.zeros((0, 128), dtype = 'uint8')
+                    # we drop the meta-information (point coordinates, orientation, etc.)
+                    image_descs.append(desc)
+                else:
+                    dense  = cv2.FeatureDetector_create("Dense")
+                    kp=dense.detect(gray)
+                    kpt,des=SIFTdetector.compute(gray,kp)
             #SPATIAL PYRAMIDS SIFT DETECTOR
             elif SIFTTYPE == "spatialPyramids":
                 des = spatialPyramids(gray, SIFTdetector, codebook)
             else:
                 raise ValueError('Not valid SIFTTYPE option')
-            if FVECTORS and SIFTTYPE == "DSIFT":
-                print "Calculating Fisher vectors"
-                init = time.time()
-                gmm = ynumpy.gmm_learn(des, CODESIZE)
-                fv  = ynumpy.fisher(gmm, des, include = ['mu','sigma'])
-                image_fvs.append(fv)
-                end = time.time()
-                print 'Done in ' + str(end - init) + ' secs.\n'
-                #Save descriptors & labels
-                init = time.time()
-
             descriptors.append(des)
+
+        if FVECTORS and SIFTTYPE == "DSIFT":
+            # make a big matrix with all image descriptors
+            all_desc = np.vstack(descriptors)
+
+            k = 64
+            n_sample = k * 1000
+
+            # choose n_sample descriptors at random
+            sample_indices = np.random.choice(all_desc.shape[0], n_sample)
+            sample = all_desc[sample_indices]
+
+            # until now sample was in uint8. Convert to float32
+            sample = sample.astype('float32')
+
+            # compute mean and covariance matrix for the PCA
+            mean = sample.mean(axis = 0)
+            sample = sample - mean
+            cov = np.dot(sample.T, sample)
+
+            # compute PCA matrix and keep only 64 dimensions
+            eigvals, eigvecs = np.linalg.eig(cov)
+            perm = eigvals.argsort()                   # sort by increasing eigenvalue
+            pca_transform = eigvecs[:, perm[64:128]]   # eigenvectors for the 64 last eigenvalues
+
+            # transform sample with PCA (note that numpy imposes line-vectors,
+            # so we right-multiply the vectors)
+            sample = np.dot(sample, pca_transform)
+
+            # train GMM
+            gmm = ynumpy.gmm_learn(sample, k)
+            print "Calculating Fisher vectors"
+            init = time.time()
+            for image_desc in image_descs:
+                # apply the PCA to the image descriptor
+                image_desc = np.dot(image_desc - mean, pca_transform)
+                # compute the Fisher vector, using only the derivative w.r.t mu
+                fv = ynumpy.fisher(gmm, image_desc, include = 'mu')
+                image_fvs.append(fv)
+            end = time.time()
+            print 'Done in ' + str(end - init) + ' secs.\n'
+            #Save descriptors & labels
+            init = time.time()
+
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.\n'
         if SIFTTYPE == "spatialPyramids" and codebook is None:
@@ -116,7 +156,8 @@ def featureExtraction(filenames, dataset, codebook = None):
         else:
             if FVECTORS and SIFTTYPE == "DSIFT":
                 print "Saving DSIFT descriptors with fisher vectors..."
-                cPickle.dump(image_fvs, open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "wb"))
+                cPickle.dump(image_fvs, open("./data_s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "wb"))
+                cPickle.dump(descriptors, open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "wb"))
             else:
                 print "Saving " + dataset + " descriptors..."
                 cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
@@ -138,7 +179,13 @@ def featureExtraction(filenames, dataset, codebook = None):
         query_imnos = [i for i, name in enumerate(filenames) if name[-2:] == "00"]
 
         # corresponding descriptors
-        D = image_fvs[query_imnos]
+        descriptors = image_fvs[query_imnos]
+        size_descriptors = descriptors[0].shape[1]
+        D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
+        startingpoint = 0
+        for i in range(len(descriptors)):
+            D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
+        startingpoint += len(descriptors[i])
         return D,descriptors
 
     # Transform everything to numpy arrays

@@ -14,16 +14,16 @@ from sklearn.model_selection import cross_val_score
 try:
     from yael import ynumpy
 except ImportError:
-    print "Yael library not found, you can not use FVECTORS variable"
-    print ""
+    print "Yael library not found, you can not use fisher vector variables\n"
 
-SIFTTYPE = "spatialPyramids"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
-KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection'
+KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
 k        = 512     #number of visual words
+CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
+#FISHER VECTORS (Only if you have Yael library installed)
 CODESIZE = 32      #use very short codebooks (32/64)
 FVECTORS = False   #True/False (Only with DSIFT)
-CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
 
 def inputImagesLabels():
     # read the train and test files
@@ -48,8 +48,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             # Load descriptors & labels
             descriptors = cPickle.load(open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "rb"))
             end = time.time()
-            print 'Done in ' + str(end - init) + ' secs.'
-            print ""
+            print 'Done in ' + str(end - init) + ' secs.\n'
 
         elif SIFTTYPE == "spatialPyramids" and codebook is not None:
             raise Exception('Compute visual words')
@@ -62,8 +61,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
             end = time.time()
 
-            print 'Done in ' + str(end - init) + ' secs.'
-            print ""
+            print 'Done in ' + str(end - init) + ' secs.\n'
 
     except (OSError, IOError, Exception):
         # create the SIFT detector object
@@ -96,8 +94,7 @@ def featureExtraction(filenames, dataset, codebook = None):
 
             descriptors.append(des)
         end = time.time()
-        print 'Done in ' + str(end - init) + ' secs.'
-        print ""
+        print 'Done in ' + str(end - init) + ' secs.\n'
         if FVECTORS and SIFTTYPE == "DSIFT":
             print "Calculating Fisher vectors"
             init = time.time()
@@ -116,8 +113,7 @@ def featureExtraction(filenames, dataset, codebook = None):
                 print "Saving " + dataset + " descriptors..."
                 cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
             end = time.time()
-            print 'Done in ' + str(end - init) + ' secs.'
-            print ""
+            print 'Done in ' + str(end - init) + ' secs.\n'
 
 
     # Transform everything to numpy arrays
@@ -170,8 +166,7 @@ def computeCodebook(D):
         else:
             codebook = cPickle.load(open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "rb"))
         end = time.time()
-        print 'Done in ' + str(end - init) + ' secs.'
-        print ""
+        print 'Done in ' + str(end - init) + ' secs.\n'
     except(IOError, EOFError):
         # compute the codebook
         print 'Computing kmeans with ' + str(k) + ' centroids...'
@@ -184,8 +179,7 @@ def computeCodebook(D):
         else:
             cPickle.dump(codebook, open("./data_s2/"+ SIFTTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()
-        print 'Done in ' + str(end - init) + ' secs.'
-        print ""
+        print 'Done in ' + str(end - init) + ' secs.\n'
     return codebook
 
 def getWords(codebook,descriptors):
@@ -261,8 +255,7 @@ def trainSVM(D_scaled,train_labels):
             scores = cross_val_score(clf, D_scaled, train_labels, cv=cv)
             print 'Acuracy for Kfold in training: ' + str(scores.mean())
     end = time.time()
-    print 'Done in ' + str(end - init) + ' secs.'
-    print ""
+    print 'Done in ' + str(end - init) + ' secs.\n'
     return clf
 
 
@@ -283,18 +276,19 @@ def evaluate(clf, D_test, test_labels, D_train):
     else:
         accuracy = 100 * clf.score(D_test, test_labels)
     end = time.time()
-    print 'Done in ' + str(end - init) + ' secs.'
-    print ""
-    print 'Final accuracy: ' + str(accuracy) + "%"
-    print ""
+    print 'Done in ' + str(end - init) + ' secs.\n'
+    print 'Final accuracy: ' + str(accuracy) + "%\n"
 
 def __main__():
     start = time.time()  # global time
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
-    D, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
-    D, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
-    codebook = computeCodebook(D)  # create codebook using train SIFT descriptors
+    D_train, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
+    D_test, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
+    if FVECTORS and SIFTTYPE == "DSIFT":
+        train_descriptors = fv_train
+        test_descriptors  = fv_test
+    codebook = computeCodebook(D_train)  # create codebook using train SIFT descriptors
     if SIFTTYPE == "spatialPyramids":
         train_visual_words, train_descriptors = featureExtraction(train_images_filenames, "train", codebook)  # get SIFT descriptors for train set
         test_visual_words, test_descriptors = featureExtraction(test_images_filenames, "test", codebook)  # get SIFT descriptors for test set

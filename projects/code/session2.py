@@ -101,9 +101,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             gmm = ynumpy.gmm_learn(des, CODESIZE)
             fv  = ynumpy.fisher(gmm, des, include = ['mu','sigma'])
             end = time.time()
-            print 'Done in ' + str(end - init) + ' secs.'
-            print fv
-
+            print 'Done in ' + str(end - init) + ' secs.\n'
             #Save descriptors & labels
             init = time.time()
             if SIFTTYPE == "spatialPyramids" or codebook is None:
@@ -124,7 +122,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
         startingpoint += len(descriptors[i])
 
-    return D,descriptors
+    return D,descriptors,fv
 
 
 def spatialPyramids(gray, SIFTdetector, codebook, levels=3):

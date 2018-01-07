@@ -16,15 +16,15 @@ try:
 except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
-SIFTTYPE = "spatialPyramids"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
-KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
-k        = 64     #number of visual words
-levels   = 4     #number of levels for spatial pyramids
+KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
+k        = 512     #number of visual words
 CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
+levels   = 4     #number of levels for spatial pyramids
 #FISHER VECTORS (Only if you have Yael library installed)
-CODESIZE = 32      #use very short codebooks (32/64)
-FVECTORS = False   #True/False (Only with DSIFT)
+CODESIZE = 3      #use very short codebooks (32/64)
+FVECTORS = True   #True/False (Only with DSIFT)
 
 def inputImagesLabels():
     # read the train and test files
@@ -40,6 +40,7 @@ def inputImagesLabels():
 def featureExtraction(filenames, dataset, codebook = None):
     descriptors = []
     des = np.array([])
+    image_fvs = []
     try:
         if SIFTTYPE == "spatialPyramids" and codebook is None:
             print "Loading SIFT " + dataset + " descritpors (to compute codebook)..."
@@ -53,6 +54,10 @@ def featureExtraction(filenames, dataset, codebook = None):
 
         elif SIFTTYPE == "spatialPyramids" and codebook is not None:
             raise Exception('Compute visual words')
+        elif FVECTORS and SIFTTYPE == "DSIFT":
+            print "Loading DSIFT with FV" + dataset + " descritpors (to compute codebook)..."
+            D = cPickle.load(open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "rb"))
+            descriptors = cPickle.load(open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "rb"))
         else:
             print "Loading " + SIFTTYPE  + " " + dataset + " descriptors..."
             if not os.path.exists("./data_s2"):
@@ -67,7 +72,6 @@ def featureExtraction(filenames, dataset, codebook = None):
     except (OSError, IOError, Exception):
         # create the SIFT detector object
         SIFTdetector = cv2.SIFT(nfeatures=300)
-
         # extract SIFT keypoints and descriptors
         # store descriptors in a python list of numpy arrays
         init = time.time()
@@ -92,28 +96,50 @@ def featureExtraction(filenames, dataset, codebook = None):
                 des = spatialPyramids(gray, SIFTdetector, codebook)
             else:
                 raise ValueError('Not valid SIFTTYPE option')
+            if FVECTORS and SIFTTYPE == "DSIFT":
+                print "Calculating Fisher vectors"
+                init = time.time()
+                gmm = ynumpy.gmm_learn(des, CODESIZE)
+                fv  = ynumpy.fisher(gmm, des, include = ['mu','sigma'])
+                image_fvs.append(fv)
+                end = time.time()
+                print 'Done in ' + str(end - init) + ' secs.\n'
+                #Save descriptors & labels
+                init = time.time()
 
             descriptors.append(des)
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.\n'
-        if FVECTORS and SIFTTYPE == "DSIFT":
-            print "Calculating Fisher vectors"
-            init = time.time()
-            gmm = ynumpy.gmm_learn(des, CODESIZE)
-            fv  = ynumpy.fisher(gmm, des, include = ['mu','sigma'])
-            end = time.time()
-            print 'Done in ' + str(end - init) + ' secs.\n'
-            #Save descriptors & labels
-            init = time.time()
         if SIFTTYPE == "spatialPyramids" and codebook is None:
             print "Saving SIFT descriptors..."
             cPickle.dump(descriptors, open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
         else:
-            print "Saving " + dataset + " descriptors..."
-            cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
-        end = time.time()
-        print 'Done in ' + str(end - init) + ' secs.\n'
+            if FVECTORS and SIFTTYPE == "DSIFT":
+                print "Saving DSIFT descriptors with fisher vectors..."
+                cPickle.dump(image_fvs, open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "wb"))
+            else:
+                print "Saving " + dataset + " descriptors..."
+                cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+    end = time.time()
+    print 'Done in ' + str(end - init) + ' secs.\n'
+    if FVECTORS and SIFTTYPE == "DSIFT":
+        # make one matrix with all FVs
+        image_fvs = np.vstack(image_fvs)
+        # normalizations are done on all descriptors at once
+        # power-normalization
+        image_fvs = np.sign(image_fvs) * np.abs(image_fvs) ** 0.5
+        # L2 normalize
+        norms = np.sqrt(np.sum(image_fvs ** 2, 1))
+        image_fvs /= norms.reshape(-1, 1)
 
+        # handle images with 0 local descriptor (100 = far away from "normal" images)
+        image_fvs[np.isnan(image_fvs)] = 100
+        # get the indices of the query images (the subset of images that end in "00")
+        query_imnos = [i for i, name in enumerate(image_names) if name[-2:] == "00"]
+
+        # corresponding descriptors
+        D = image_fvs[query_imnos]
+        return D,descriptors
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]
@@ -284,10 +310,7 @@ def __main__():
 
     train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
     D_train, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
-    D_test, test_descriptors = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
-    if FVECTORS and SIFTTYPE == "DSIFT":
-        train_descriptors = fv_train
-        test_descriptors  = fv_test
+    D_test, test_descriptors   = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
     codebook = computeCodebook(D_train)  # create codebook using train SIFT descriptors
     if SIFTTYPE == "spatialPyramids":
         train_visual_words, train_descriptors = featureExtraction(train_images_filenames, "train", codebook)  # get SIFT descriptors for train set

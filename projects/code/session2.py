@@ -16,9 +16,9 @@ try:
 except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
-SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "spatialPyramids"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
-KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
+KERNEL   = 'histogramIntersection'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
 k        = 512     #number of visual words
 CVSCORES = False    #True/False use Kfold to get cross validation accuracy mean
 #FISHER VECTORS (Only if you have Yael library installed)
@@ -53,7 +53,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         elif SIFTTYPE == "spatialPyramids" and codebook is not None:
             raise Exception('Compute visual words')
         else:
-            print "Loading " + SIFTTYPE  + dataset + " descriptors..."
+            print "Loading " + SIFTTYPE  + " " + dataset + " descriptors..."
             if not os.path.exists("./data_s2"):
                 os.makedirs("./data_s2")
             init = time.time()
@@ -104,14 +104,14 @@ def featureExtraction(filenames, dataset, codebook = None):
             print 'Done in ' + str(end - init) + ' secs.\n'
             #Save descriptors & labels
             init = time.time()
-            if SIFTTYPE == "spatialPyramids" or codebook is None:
-                print "Saving SIFT descriptors..."
-                cPickle.dump(descriptors, open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
-            else:
-                print "Saving " + dataset + " descriptors..."
-                cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
-            end = time.time()
-            print 'Done in ' + str(end - init) + ' secs.\n'
+        if SIFTTYPE == "spatialPyramids" and codebook is None:
+            print "Saving SIFT descriptors..."
+            cPickle.dump(descriptors, open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
+        else:
+            print "Saving " + dataset + " descriptors..."
+            cPickle.dump(descriptors, open("./data_s2/" + SIFTTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+        end = time.time()
+        print 'Done in ' + str(end - init) + ' secs.\n'
 
 
     # Transform everything to numpy arrays
@@ -122,7 +122,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
         startingpoint += len(descriptors[i])
 
-    return D,descriptors,fv
+    return D,descriptors
 
 
 def spatialPyramids(gray, SIFTdetector, codebook, levels=3):

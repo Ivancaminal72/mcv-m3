@@ -16,7 +16,7 @@ try:
 except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
-SIFTTYPE = "SIFT"  #DSIFT/SIFT/spatialPyramids
+SIFTTYPE = "DSIFT"  #DSIFT/SIFT/spatialPyramids
 USECV    = False   #True/False
 KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
 k        = 512     #number of visual words
@@ -85,7 +85,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             ima = cv2.imread(filename)
             gray = cv2.cvtColor(ima, cv2.COLOR_BGR2GRAY)
             #SIFT DETECTOR
-            if SIFTTYPE == "SIFT" or "spatialPyramids" and codebook is None:
+            if (SIFTTYPE == "SIFT" or SIFTTYPE=="spatialPyramids") and codebook is None:
                 kpt, des = SIFTdetector.detectAndCompute(gray, None)
             #DENSE SIFT DETECTOR
             elif SIFTTYPE == "DSIFT":
@@ -96,6 +96,13 @@ def featureExtraction(filenames, dataset, codebook = None):
                     image_descs.append(desc)
                 else:
                     dense  = cv2.FeatureDetector_create("Dense")
+                    dense.setDouble('featureScaleMul', 0.1)
+                    dense.setInt('featureScaleLevels', 1)
+                    dense.setInt('initXyStep', 5)
+                    dense.setInt('initFeatureScale', 7)
+                    dense.setBool('varyImgBoundWithScale', False)
+                    dense.setBool('varyXyStepWithScale', True)
+
                     kp=dense.detect(gray)
                     kpt,des=SIFTdetector.compute(gray,kp)
             #SPATIAL PYRAMIDS SIFT DETECTOR

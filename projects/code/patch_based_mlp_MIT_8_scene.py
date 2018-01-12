@@ -1,8 +1,8 @@
+from __future__ import print_function
 import os
 import getpass
 os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 
-#from __future__ import print_function
 from utils import *
 from PIL import Image
 from keras.models import Sequential

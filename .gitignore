@@ -1,5 +1,7 @@
 **/.idea
-**/*.jpg
+**/.DS_Store
+**/._*
+**/*.png
 **/*.pgm
 **/*.pklz
 **/*.pkl

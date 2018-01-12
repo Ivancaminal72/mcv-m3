@@ -1,5 +1,10 @@
+import os
+import getpass
+os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
+
 from __future__ import print_function
 from utils import *
+from PIL import Image
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Reshape
 from keras.preprocessing.image import ImageDataGenerator
@@ -7,9 +12,9 @@ from keras.preprocessing.image import ImageDataGenerator
 #user defined variables
 PATCH_SIZE  = 64
 BATCH_SIZE  = 16
-DATASET_DIR = 'data/MIT_split'
-PATCHES_DIR = 'data/MIT_split_patches'
-MODEL_FNAME = 'patch_based_mlp.h5'
+DATASET_DIR = '/share/datasets/MIT_split'
+PATCHES_DIR = '/home/master00/work/data/MIT_split_patches'
+MODEL_FNAME = '/home/master00/work/patch_based_mlp.h5'
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   model = Sequential()
@@ -23,16 +28,16 @@ def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   return model
 
 if not os.path.exists(DATASET_DIR):
-  colorprint(Color.RED, 'ERROR: dataset directory '+DATASET_DIR+' do not exists!\n')
+  print('ERROR: dataset directory '+DATASET_DIR+' do not exists!\n')
   quit()
 if not os.path.exists(PATCHES_DIR):
-  colorprint(Color.YELLOW, 'WARNING: patches dataset directory '+PATCHES_DIR+' do not exists!\n')
-  colorprint(Color.BLUE, 'Creating image patches dataset into '+PATCHES_DIR+'\n')
+  print('WARNING: patches dataset directory '+PATCHES_DIR+' do not exists!\n')
+  print('Creating image patches dataset into '+PATCHES_DIR+'\n')
   generate_image_patches_db(DATASET_DIR,PATCHES_DIR,patch_size=PATCH_SIZE)
-  colorprint(Color.BLUE, 'Done!\n')
+  print('Done!\n')
 
 
-colorprint(Color.BLUE, 'Building MLP model...\n')
+print('Building MLP model...\n')
 
 model = build_mlp(input_size=PATCH_SIZE)
 
@@ -42,11 +47,11 @@ model.compile(loss='categorical_crossentropy',
 
 print(model.summary())
 
-colorprint(Color.BLUE, 'Done!\n')
+print('Done!\n')
 
 if not os.path.exists(MODEL_FNAME):
-  colorprint(Color.YELLOW, 'WARNING: model file '+MODEL_FNAME+' do not exists!\n')
-  colorprint(Color.BLUE, 'Start training...\n')
+  print('WARNING: model file '+MODEL_FNAME+' do not exists!\n')
+  print('Start training...\n')
   # this is the dataset configuration we will use for training
   # only rescaling
   train_datagen = ImageDataGenerator(
@@ -82,27 +87,27 @@ if not os.path.exists(MODEL_FNAME):
           validation_data=validation_generator,
           validation_steps=8070 // BATCH_SIZE)
   
-  colorprint(Color.BLUE, 'Done!\n')
-  colorprint(Color.BLUE, 'Saving the model into '+MODEL_FNAME+' \n')
+  print('Done!\n')
+  print('Saving the model into '+MODEL_FNAME+' \n')
   model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
-  colorprint(Color.BLUE, 'Done!\n')
+  rint('Done!\n')
 
 
-colorprint(Color.BLUE, 'Building MLP model for testing...\n')
+print('Building MLP model for testing...\n')
 
 model = build_mlp(input_size=PATCH_SIZE, phase='TEST')
 print(model.summary())
 
-colorprint(Color.BLUE, 'Done!\n')
+print(C'Done!\n')
 
-colorprint(Color.BLUE, 'Loading weights from '+MODEL_FNAME+' ...\n')
+print('Loading weights from '+MODEL_FNAME+' ...\n')
 print ('\n')
 
 model.load_weights(MODEL_FNAME)
 
-colorprint(Color.BLUE, 'Done!\n')
+print('Done!\n')
 
-colorprint(Color.BLUE, 'Start evaluation ...\n')
+print('Start evaluation ...\n')
 
 directory = DATASET_DIR+'/test'
 classes = {'coast':0,'forest':1,'highway':2,'inside_city':3,'mountain':4,'Opencountry':5,'street':6,'tallbuilding':7}
@@ -122,5 +127,5 @@ for class_dir in os.listdir(directory):
       count += 1
       print('Evaluated images: '+str(count)+' / '+str(total), end='\r')
     
-colorprint(Color.BLUE, 'Done!\n')
-colorprint(Color.GREEN, 'Test Acc. = '+str(correct/total)+'\n')
+print('Done!\n')
+print('Test Acc. = '+str(correct/total)+'\n')

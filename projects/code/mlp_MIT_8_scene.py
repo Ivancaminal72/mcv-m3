@@ -1,21 +1,31 @@
+import os
+import getpass
+os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
+
+
 from utils import *
-from keras.models import Sequential
+from keras.models import Sequential, Model
 from keras.layers import Flatten, Dense, Reshape
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import plot_model
+import matplotlib.pyplot as plt
+from PIL import Image
+import numpy as np
+from scipy.misc import imresize
+
 
 #user defined variables
 IMG_SIZE    = 32
 BATCH_SIZE  = 16
-DATASET_DIR = '/home/datasets/scenes/MIT_split'
-MODEL_FNAME = 'my_first_mlp.h5'
+DATASET_DIR = '/share/datasets/MIT_split'
+MODEL_FNAME = '/home/master03/Alex/work/my_first_mlp.h5'
 
 if not os.path.exists(DATASET_DIR):
   colorprint(Color.RED, 'ERROR: dataset directory '+DATASET_DIR+' do not exists!\n')
   quit()
 
 
-colorprint(Color.BLUE, 'Building MLP model...\n')
+print('Building MLP model...\n')
 
 #Build the Multi Layer Perceptron model
 model = Sequential()
@@ -31,12 +41,12 @@ model.compile(loss='categorical_crossentropy',
 print(model.summary())
 plot_model(model, to_file='modelMLP.png', show_shapes=True, show_layer_names=True)
 
-colorprint(Color.BLUE, 'Done!\n')
+print('Done!\n')
 
 if os.path.exists(MODEL_FNAME):
-  colorprint(Color.YELLOW, 'WARNING: model file '+MODEL_FNAME+' exists and will be overwritten!\n')
+  print('WARNING: model file '+MODEL_FNAME+' exists and will be overwritten!\n')
 
-colorprint(Color.BLUE, 'Start training...\n')
+print('Start training...\n')
 
 # this is the dataset configuration we will use for training
 # only rescaling
@@ -73,10 +83,10 @@ history = model.fit_generator(
         validation_data=validation_generator,
         validation_steps=807 // BATCH_SIZE)
 
-colorprint(Color.BLUE, 'Done!\n')
-colorprint(Color.BLUE, 'Saving the model into '+MODEL_FNAME+' \n')
+print('Done!\n')
+print('Saving the model into '+MODEL_FNAME+' \n')
 model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
-colorprint(Color.BLUE, 'Done!\n')
+print('Done!\n')
 
   # summarize history for accuracy
 plt.plot(history.history['acc'])
@@ -95,3 +105,16 @@ plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['train', 'validation'], loc='upper left')
 plt.savefig('loss.jpg')
+
+#to get the output of a given layer
+ #crop the model up to a certain layer
+model_layer = Model(inputs=model.input, outputs=model.get_layer('second').output)
+
+#get the features from images
+directory = DATASET_DIR+'/test/coast'
+x = np.asarray(Image.open(os.path.join(directory, os.listdir(directory)[0] )))
+x = np.expand_dims(imresize(x, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
+print('prediction for image ' + os.path.join(directory, os.listdir(directory)[0] ))
+features = model_layer.predict(x/255.0)
+print(features)
+print('Done!')

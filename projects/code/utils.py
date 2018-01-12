@@ -20,16 +20,6 @@ class Color:
     WHITE=37
     CRIMSON=38    
 
-def colorize(num, string, bold=False, highlight = False):
-    assert isinstance(num, int)
-    attr = []
-    if highlight: num += 10
-    attr.append(str(num))
-    if bold: attr.append('1')
-    return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
-
-def colorprint(colorcode, text, o=sys.stdout, bold=False):
-    o.write(colorize(colorcode, text, bold=bold))
 
 def generate_image_patches_db(in_directory,out_directory,patch_size=64):
   if not os.path.exists(out_directory):

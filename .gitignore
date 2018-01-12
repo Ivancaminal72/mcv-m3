@@ -6,6 +6,7 @@
 **/*.pklz
 **/*.pkl
 **/*.dat
+**/*.h5
 **/*.zip
 **/*.ipynb_checkpoints
 **/Databases

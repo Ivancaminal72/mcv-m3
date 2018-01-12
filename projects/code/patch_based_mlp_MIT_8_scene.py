@@ -12,19 +12,19 @@ from keras.preprocessing.image import ImageDataGenerator
 #user defined variables
 PATCH_SIZE  = 64
 BATCH_SIZE  = 16
-DATASET_DIR = '/share/datasets/MIT_split'
-PATCHES_DIR = '/home/master03/ivan/data/MIT_split_patches'
-MODEL_FNAME = '/home/master03/ivan/patch_based_mlp.h5'
+DATASET_DIR = '/share/datasets/MIT_split/'
+PATCHES_DIR = '/home/master03/data/16patches'
+MODEL_FNAME = '/home/master03/16patch_based_mlp.h5'
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   model = Sequential()
-  model.add(Reshape((input_size*input_size*3,),input_shape=(input_size, input_size, 3)))
-  model.add(Dense(units=2048, activation='relu'))
+  model.add(Reshape((input_size*input_size*3,),input_shape=(input_size, input_size, 3),name='first'))
+  model.add(Dense(units=2048, activation='relu'),name='second')
   #model.add(Dense(units=1024, activation='relu'))
   if phase=='TEST':
-    model.add(Dense(units=8, activation='linear')) # In test phase we softmax the average output over the image patches
+    model.add(Dense(units=8, activation='linear'),name='third') # In test phase we softmax the average output over the image patches
   else:
-    model.add(Dense(units=8, activation='softmax'))
+    model.add(Dense(units=8, activation='softmax'),name='third')
   return model
 
 if not os.path.exists(DATASET_DIR):
@@ -57,11 +57,9 @@ if not os.path.exists(MODEL_FNAME):
   train_datagen = ImageDataGenerator(
           rescale=1./255,
           horizontal_flip=True)
-  
   # this is the dataset configuration we will use for testing:
   # only rescaling
   test_datagen = ImageDataGenerator(rescale=1./255)
-  
   # this is a generator that will read pictures found in
   # subfolers of 'data/train', and indefinitely generate
   # batches of augmented image data
@@ -71,7 +69,6 @@ if not os.path.exists(MODEL_FNAME):
           batch_size=BATCH_SIZE,
           classes = ['coast','forest','highway','inside_city','mountain','Opencountry','street','tallbuilding'],
           class_mode='categorical')  # since we use binary_crossentropy loss, we need categorical labels
-  
   # this is a similar generator, for validation data
   validation_generator = test_datagen.flow_from_directory(
           PATCHES_DIR+'/test',
@@ -79,14 +76,12 @@ if not os.path.exists(MODEL_FNAME):
           batch_size=BATCH_SIZE,
           classes = ['coast','forest','highway','inside_city','mountain','Opencountry','street','tallbuilding'],
           class_mode='categorical')
-  
   model.fit_generator(
           train_generator,
           steps_per_epoch=18810 // BATCH_SIZE,
           epochs=150,
           validation_data=validation_generator,
           validation_steps=8070 // BATCH_SIZE)
-  
   print('Done!\n')
   print('Saving the model into '+MODEL_FNAME+' \n')
   model.save_weights(MODEL_FNAME)  # always save your weights after training or during training

@@ -2,7 +2,7 @@ import os
 import getpass
 os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 
-from __future__ import print_function
+#from __future__ import print_function
 from utils import *
 from PIL import Image
 from keras.models import Sequential
@@ -13,8 +13,8 @@ from keras.preprocessing.image import ImageDataGenerator
 PATCH_SIZE  = 64
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split'
-PATCHES_DIR = '/home/master00/work/data/MIT_split_patches'
-MODEL_FNAME = '/home/master00/work/patch_based_mlp.h5'
+PATCHES_DIR = '/home/master03/ivan/data/MIT_split_patches'
+MODEL_FNAME = '/home/master03/ivan/patch_based_mlp.h5'
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   model = Sequential()
@@ -90,7 +90,7 @@ if not os.path.exists(MODEL_FNAME):
   print('Done!\n')
   print('Saving the model into '+MODEL_FNAME+' \n')
   model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
-  rint('Done!\n')
+  print('Done!\n')
 
 
 print('Building MLP model for testing...\n')
@@ -98,7 +98,7 @@ print('Building MLP model for testing...\n')
 model = build_mlp(input_size=PATCH_SIZE, phase='TEST')
 print(model.summary())
 
-print(C'Done!\n')
+print('Done!\n')
 
 print('Loading weights from '+MODEL_FNAME+' ...\n')
 print ('\n')
@@ -125,7 +125,7 @@ for class_dir in os.listdir(directory):
       if predicted_cls == cls:
         correct+=1
       count += 1
-      print('Evaluated images: '+str(count)+' / '+str(total), end='\r')
+      print('Evaluated images: '+str(count)+' / '+str(total)+'\n')
     
 print('Done!\n')
 print('Test Acc. = '+str(correct/total)+'\n')

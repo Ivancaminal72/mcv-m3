@@ -18,7 +18,7 @@ from scipy.misc import imresize
 IMG_SIZE    = 32
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split'
-MODEL_FNAME = '/home/master03/Alex/work/my_first_mlp.h5'
+MODEL_FNAME = '/home/master03/ivan/my_first_mlp.h5'
 
 if not os.path.exists(DATASET_DIR):
   colorprint(Color.RED, 'ERROR: dataset directory '+DATASET_DIR+' do not exists!\n')

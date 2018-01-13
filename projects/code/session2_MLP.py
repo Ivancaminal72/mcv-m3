@@ -375,8 +375,8 @@ def __main__():
         train_images_filenames, test_images_filenames, train_labels, test_labels=inputImagesLabels() #get images sets
     else:
         try:
-            train_labels = cPickle.load(open(MLP_DES_DIR + "/train/MLP_2048_labels.dat", "rb"))
-            test_labels = cPickle.load(open(MLP_DES_DIR + "/test/MLP_2048_labels.dat", "rb"))
+            train_labels = cPickle.load(open(MLP_DES_DIR + "/train/MLP_"+str(DES_LEN)+"_labels.dat", "rb"))
+            test_labels = cPickle.load(open(MLP_DES_DIR + "/test/MLP_"+str(DES_LEN)+"_labels.dat", "rb"))
         except(IOError, EOFError):
             print("Cant load " + DESTYPE + "_" + str(DES_LEN) +" labels")
 

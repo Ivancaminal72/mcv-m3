@@ -11,20 +11,21 @@ from keras.preprocessing.image import ImageDataGenerator
 
 #user defined variables
 PATCH_SIZE  = 64
+PATCH_LEN   = 8
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split/'
-PATCHES_DIR = '/home/master03/data/16patches'
-MODEL_FNAME = '/home/master03/16patch_based_mlp.h5'
+PATCHES_DIR = '/home/master03/data/'+str(PATCH_LEN)+'patches'
+MODEL_FNAME = '/home/master03/'+str(PATCH_LEN)+'patch_based_mlp.h5'
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   model = Sequential()
   model.add(Reshape((input_size*input_size*3,),input_shape=(input_size, input_size, 3),name='first'))
-  model.add(Dense(units=2048, activation='relu'),name='second')
+  model.add(Dense(units=2048, activation='relu',name='second'))
   #model.add(Dense(units=1024, activation='relu'))
   if phase=='TEST':
-    model.add(Dense(units=8, activation='linear'),name='third') # In test phase we softmax the average output over the image patches
+    model.add(Dense(units=8, activation='linear',name='third')) # In test phase we softmax the average output over the image patches
   else:
-    model.add(Dense(units=8, activation='softmax'),name='third')
+    model.add(Dense(units=8, activation='softmax',name='third'))
   return model
 
 if not os.path.exists(DATASET_DIR):
@@ -33,7 +34,7 @@ if not os.path.exists(DATASET_DIR):
 if not os.path.exists(PATCHES_DIR):
   print('WARNING: patches dataset directory '+PATCHES_DIR+' do not exists!\n')
   print('Creating image patches dataset into '+PATCHES_DIR+'\n')
-  generate_image_patches_db(DATASET_DIR,PATCHES_DIR,patch_size=PATCH_SIZE)
+  generate_image_patches_db(DATASET_DIR,PATCHES_DIR,PATCH_SIZE,PATCH_LEN)
   print('Done!\n')
 
 
@@ -114,7 +115,7 @@ for class_dir in os.listdir(directory):
     cls = classes[class_dir]
     for imname in os.listdir(os.path.join(directory,class_dir)):
       im = Image.open(os.path.join(directory,class_dir,imname))
-      patches = image.extract_patches_2d(np.array(im), (PATCH_SIZE, PATCH_SIZE), max_patches=1.0)
+      patches = image.extract_patches_2d(np.array(im), (PATCH_SIZE, PATCH_SIZE), max_patches=PATCH_LEN)
       out = model.predict(patches/255.)
       predicted_cls = np.argmax( softmax(np.mean(out,axis=0)) )
       if predicted_cls == cls:

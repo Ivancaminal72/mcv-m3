@@ -37,6 +37,7 @@ model.load_weights(MODEL_FNAME)
 
 #Get the output of a hidden layer
 sec_layer = Model(inputs=model.input, outputs=model.get_layer('second').output)
+DES_LEN = sec_layer.outputs
 
 #Load Train patches and compute descriptors
 D_train = []
@@ -63,9 +64,9 @@ for class_dir in os.listdir(PATCHES_DIR+'/test'):
 
 #Save to memory
 print("Saving MLP_2048 labels & descriptors...")
-cPickle.dump(D_train, open(os.path.join(DESCRIPTORS_DIR,'/train','MLP_2048_descriptors.dat'), "wb"))
-cPickle.dump(L_train, open(os.path.join(DESCRIPTORS_DIR,'/train','MLP_2048_labels.dat'), "wb"))
-cPickle.dump(D_test, open(os.path.join(DESCRIPTORS_DIR,'/test','MLP_2048_descriptors.dat'), "wb"))
-cPickle.dump(L_test, open(os.path.join(DESCRIPTORS_DIR,'/test','MLP_2048_labels.dat'), "wb"))
+cPickle.dump(D_train, open(os.path.join(DESCRIPTORS_DIR,'/train','MLP_'+str(DES_LEN)+'_descriptors.dat'), "wb"))
+cPickle.dump(L_train, open(os.path.join(DESCRIPTORS_DIR,'/train','MLP_'+str(DES_LEN)+'_labels.dat'), "wb"))
+cPickle.dump(D_test, open(os.path.join(DESCRIPTORS_DIR,'/test','MLP_'+str(DES_LEN)+'_descriptors.dat'), "wb"))
+cPickle.dump(L_test, open(os.path.join(DESCRIPTORS_DIR,'/test','MLP_'+str(DES_LEN)+'_labels.dat'), "wb"))
 
 

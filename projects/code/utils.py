@@ -21,7 +21,7 @@ class Color:
     CRIMSON=38    
 
 
-def generate_image_patches_db(in_directory,out_directory,patch_size=64):
+def generate_image_patches_db(in_directory,out_directory,patch_size, patch_length):
   if not os.path.exists(out_directory):
       os.makedirs(out_directory)
  
@@ -39,7 +39,7 @@ def generate_image_patches_db(in_directory,out_directory,patch_size=64):
         count += 1
         print('Processed images: '+str(count)+' / '+str(total), end='\r')
         im = Image.open(os.path.join(in_directory,split_dir,class_dir,imname))
-        patches = image.extract_patches_2d(np.array(im), (64, 64), 16)
+        patches = image.extract_patches_2d(np.array(im), (patch_size, patch_size), patch_length)
         for i,patch in enumerate(patches):
           patch = Image.fromarray(patch)
           patch.save(os.path.join(out_directory,split_dir,class_dir,imname.split('.')[0]+'_'+str(i)+'.jpg'))

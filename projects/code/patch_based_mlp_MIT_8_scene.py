@@ -68,7 +68,7 @@ if not os.path.exists(MODEL_FNAME):
           target_size=(PATCH_SIZE, PATCH_SIZE),  # all images will be resized to PATCH_SIZExPATCH_SIZE
           batch_size=BATCH_SIZE,
           classes = ['coast','forest','highway','inside_city','mountain','Opencountry','street','tallbuilding'],
-          class_mode='categorical')  # since we use binary_crossentropy loss, we need categorical labels
+          class_mode='categorical')  # since we use binary_crossentropy loss, we need categorical L_train
   # this is a similar generator, for validation data
   validation_generator = test_datagen.flow_from_directory(
           PATCHES_DIR+'/test',

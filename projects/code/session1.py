@@ -139,7 +139,7 @@ def trainBayesClassifier(D, L):
     return myGNB
 
 def predictAndTest( classifier,descriptors,label_per_descriptor):
-    # get all the test data and predict their labels
+    # get all the test data and predict their L_train
     numtestimages = 0
     numcorrect = 0
     PredictList = []

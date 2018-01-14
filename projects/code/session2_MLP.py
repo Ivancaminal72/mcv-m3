@@ -256,7 +256,7 @@ def computeCodebook(D):
         if DESTYPE == "spatialPyramids":
             codebook = cPickle.load(open("./../data/s2/SIFT_" + str(k) + "_codebook.dat", "rb"))
         elif DESTYPE == "MLP":
-            codebook = cPickle.load(open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+str(DES_LEN)+str(PATCH_SIZE)+str(PATCH_LEN)+".dat", "rb"))
+            codebook = cPickle.load(open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+"_"+str(DES_LEN)+"_"+str(PATCH_SIZE)+"_"+str(PATCH_LEN)+".dat", "rb"))
         else:
             codebook = cPickle.load(open("./../data/s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "rb"))
         end = time.time()
@@ -271,7 +271,7 @@ def computeCodebook(D):
         if DESTYPE == "spatialPyramids":
             cPickle.dump(codebook, open("./../data/s2/SIFT_" + str(k) + "_codebook.dat", "wb"))
         elif DESTYPE == "MLP":
-            cPickle.dump(codebook, open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+str(DES_LEN)+str(PATCH_SIZE)+str(PATCH_LEN)+".dat", "wb"))
+            cPickle.dump(codebook, open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+"_"+str(DES_LEN)+"_"+str(PATCH_SIZE)+"_"+str(PATCH_LEN)+".dat", "wb"))
         else:
             cPickle.dump(codebook, open("./../data/s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()

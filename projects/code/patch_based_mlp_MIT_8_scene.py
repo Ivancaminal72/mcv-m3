@@ -11,14 +11,14 @@ from keras.layers import Flatten, Dense, Reshape
 from keras.preprocessing.image import ImageDataGenerator
 
 #user defined variables
-PATCH_SIZE  = 32
-PATCH_LEN   = 32
-DES_LEN = 1024
+PATCH_SIZE  = 64
+PATCH_LEN   = 8
+DES_LEN = 128
+NUM_EPOCHS= 5
 BATCH_SIZE  = 16
-NUM_EPOCHS= 150
 DATASET_DIR = '/share/datasets/MIT_split/'
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
-MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'_'+str(NUM_EPOCHS)+'.h5'
+MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'_'+str(NUM_EPOCHS)+'_'+str(DES_LEN)+'.h5'
 
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):

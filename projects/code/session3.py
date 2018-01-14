@@ -9,13 +9,13 @@ from PIL import Image, ImageOps
 from keras.models import Model, Sequential
 from keras.layers import Flatten, Dense, Reshape
 
-PATCH_SIZE  = 32
-PATCH_LEN   = 32
-DES_LEN = 1024
-NUM_EPOCHS = 150
+PATCH_SIZE  = 64
+PATCH_LEN   = 8
+DES_LEN = 128
+NUM_EPOCHS = 5
 MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
-MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'_'+str(NUM_EPOCHS)+'.h5'
+MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'_'+str(NUM_EPOCHS)+'_'+str(DES_LEN)+'.h5'
 classes = {'coast':0,'forest':1,'highway':2,'inside_city':3,'mountain':4,'Opencountry':5,'street':6,'tallbuilding':7}
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):

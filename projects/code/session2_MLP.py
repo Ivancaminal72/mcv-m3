@@ -14,9 +14,9 @@ except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
 #MLP options
-PATCH_SIZE  = 32
-PATCH_LEN   = 32
-DES_LEN = 1024
+PATCH_SIZE  = 64
+PATCH_LEN   = 8
+DES_LEN = 128
 MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'.h5'
@@ -399,8 +399,8 @@ def __main__():
             train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
             test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
     else:
-        train_visual_words = train_descriptors
-        test_visual_words = test_descriptors
+        train_visual_words = D_train
+        test_visual_words = D_test
     stdSlr = StandardScaler().fit(train_visual_words.astype(float))
     D_train = stdSlr.transform(train_visual_words.astype(float))  # normalize train words
     D_test = stdSlr.transform(test_visual_words.astype(float))  # normalize test words

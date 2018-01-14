@@ -21,6 +21,7 @@ MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LE
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'.h5'
 #General options
+useBoW = True #Do bag of words
 DESTYPE = "MLP"  #DSIFT/SIFT/spatialPyramids/MLP
 USECV    = False   #True/False
 KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
@@ -389,14 +390,17 @@ def __main__():
 
     D_train, train_descriptors = featureExtraction(train_images_filenames, "train") #get SIFT descriptors for train set
     D_test, test_descriptors   = featureExtraction(test_images_filenames, "test")  # get SIFT descriptors for test set
-    codebook = computeCodebook(D_train)  # create codebook using train SIFT descriptors
-    if DESTYPE == "spatialPyramids":
-        train_visual_words, train_descriptors = featureExtraction(train_images_filenames, "train", codebook)  # get SIFT descriptors for train set
-        test_visual_words, test_descriptors = featureExtraction(test_images_filenames, "test", codebook)  # get SIFT descriptors for test set
+    if useBoW:
+        codebook = computeCodebook(D_train)  # create codebook using train SIFT descriptors
+        if DESTYPE == "spatialPyramids":
+            train_visual_words, train_descriptors = featureExtraction(train_images_filenames, "train", codebook)  # get SIFT descriptors for train set
+            test_visual_words, test_descriptors = featureExtraction(test_images_filenames, "test", codebook)  # get SIFT descriptors for test set
+        else:
+            train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
+            test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
     else:
-        train_visual_words = getWords(codebook, train_descriptors)  # assign descriptors to nearest word(features cluster) in codebook
-        test_visual_words = getWords(codebook, test_descriptors)  # words found at test set
-
+        train_visual_words = train_descriptors
+        test_visual_words = test_descriptors
     stdSlr = StandardScaler().fit(train_visual_words.astype(float))
     D_train = stdSlr.transform(train_visual_words.astype(float))  # normalize train words
     D_test = stdSlr.transform(test_visual_words.astype(float))  # normalize test words

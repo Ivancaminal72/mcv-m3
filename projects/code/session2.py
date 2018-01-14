@@ -3,13 +3,11 @@ import numpy as np
 import cPickle
 import time
 import os
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV
-from sklearn import svm
-from sklearn import cluster
 import matplotlib.pyplot as plt
-from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV, ShuffleSplit, cross_val_score
+from sklearn import svm,cluster
+
 
 try:
     from yael import ynumpy

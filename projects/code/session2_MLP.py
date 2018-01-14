@@ -3,22 +3,25 @@ import numpy as np
 import cPickle
 import time
 import os
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV
-from sklearn import svm
-from sklearn import cluster
 import matplotlib.pyplot as plt
-from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV, ShuffleSplit, cross_val_score
+from sklearn import svm,cluster
 
 try:
     from yael import ynumpy
 except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
+#MLP options
+PATCH_SIZE  = 32
+PATCH_LEN   = 32
+DES_LEN = 1024
+MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
+PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
+MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'.h5'
+#General options
 DESTYPE = "MLP"  #DSIFT/SIFT/spatialPyramids/MLP
-MLP_DES_DIR = "/data/MIT_split_descriptors" #Descriptors/L_train directory
-DES_LEN = 2048 #Length of the descriptors
 USECV    = False   #True/False
 KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)
 k        = 512     #number of visual words
@@ -46,11 +49,11 @@ def featureExtraction(filenames, dataset, codebook = None):
     try:
         if DESTYPE == "spatialPyramids" and codebook is None:
             print "Loading SIFT " + dataset + " descritpors (to compute codebook)..."
-            if not os.path.exists("./data_s2"):
-                os.makedirs("./data_s2")
+            if not os.path.exists("./../data/s2"):
+                os.makedirs("./../data/s2")
             init = time.time()
             # Load descriptors & L_train
-            descriptors = cPickle.load(open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "rb"))
+            descriptors = cPickle.load(open("./../data/s2/SIFT_" + dataset + "_descriptors.dat", "rb"))
             end = time.time()
             print 'Done in ' + str(end - init) + ' secs.\n'
 
@@ -58,17 +61,17 @@ def featureExtraction(filenames, dataset, codebook = None):
             raise Exception('Compute visual words')
         elif FVECTORS and DESTYPE == "DSIFT":
             print "Loading DSIFT with FV" + dataset + " descritpors (to compute codebook)..."
-            image_fvs   = cPickle.load(open("./data_s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "rb"))
-            descriptors = cPickle.load(open("./data_s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "rb"))
+            image_fvs   = cPickle.load(open("./../data/s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "rb"))
+            descriptors = cPickle.load(open("./../data/s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "rb"))
         elif DESTYPE == "MLP":
             descriptors = cPickle.load(open(MLP_DES_DIR +"/"+dataset+"/MLP_"+str(DES_LEN)+"_descriptors.dat", "rb"))
         else:
             print "Loading " + DESTYPE + " " + dataset + " descriptors..."
-            if not os.path.exists("./data_s2"):
-                os.makedirs("./data_s2")
+            if not os.path.exists("./../data/s2"):
+                os.makedirs("./../data/s2")
             init = time.time()
             # Load descriptors & L_train
-            descriptors = cPickle.load(open("./data_s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "rb"))
+            descriptors = cPickle.load(open("./../data/s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "rb"))
             end = time.time()
 
             print 'Done in ' + str(end - init) + ' secs.\n'
@@ -167,15 +170,15 @@ def featureExtraction(filenames, dataset, codebook = None):
         init = time.time()
         if DESTYPE == "spatialPyramids" and codebook is None:
             print "Saving SIFT descriptors..."
-            cPickle.dump(descriptors, open("./data_s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
+            cPickle.dump(descriptors, open("./../data/s2/SIFT_" + dataset + "_descriptors.dat", "wb"))
         else:
             if FVECTORS and DESTYPE == "DSIFT":
                 print "Saving DSIFT descriptors with fisher vectors..."
-                cPickle.dump(image_fvs, open("./data_s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "wb"))
-                cPickle.dump(descriptors, open("./data_s2/DSIFT_FV" + dataset + "_descriptors.dat", "wb"))
+                cPickle.dump(image_fvs, open("./../data/s2/DSIFT_FV_image_fvs" + dataset + "_descriptors.dat", "wb"))
+                cPickle.dump(descriptors, open("./../data/s2/DSIFT_FV" + dataset + "_descriptors.dat", "wb"))
             else:
                 print "Saving " + dataset + " descriptors..."
-                cPickle.dump(descriptors, open("./data_s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "wb"))
+                cPickle.dump(descriptors, open("./../data/s2/" + DESTYPE + "_" + dataset + "_descriptors.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.\n'
 
@@ -251,9 +254,11 @@ def computeCodebook(D):
         print 'Loading kmeans with ' + str(k) + ' centroids...'
         init = time.time()
         if DESTYPE == "spatialPyramids":
-            codebook = cPickle.load(open("./data_s2/SIFT_" + str(k) + "_codebook.dat", "rb"))
+            codebook = cPickle.load(open("./../data/s2/SIFT_" + str(k) + "_codebook.dat", "rb"))
+        elif DESTYPE == "MLP":
+            codebook = cPickle.load(open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+str(DES_LEN)+str(PATCH_SIZE)+str(PATCH_LEN)+".dat", "rb"))
         else:
-            codebook = cPickle.load(open("./data_s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "rb"))
+            codebook = cPickle.load(open("./../data/s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "rb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.\n'
     except(IOError, EOFError):
@@ -264,9 +269,11 @@ def computeCodebook(D):
                                            reassignment_ratio=10 ** -4, random_state=42)
         codebook.fit(D)
         if DESTYPE == "spatialPyramids":
-            cPickle.dump(codebook, open("./data_s2/SIFT_" + str(k) + "_codebook.dat", "wb"))
+            cPickle.dump(codebook, open("./../data/s2/SIFT_" + str(k) + "_codebook.dat", "wb"))
+        elif DESTYPE == "MLP":
+            cPickle.dump(codebook, open("./../data/s2/codebook_"+DESTYPE+"_"+str(k)+str(DES_LEN)+str(PATCH_SIZE)+str(PATCH_LEN)+".dat", "wb"))
         else:
-            cPickle.dump(codebook, open("./data_s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "wb"))
+            cPickle.dump(codebook, open("./../data/s2/" + DESTYPE + "_" + str(k) + "_codebook.dat", "wb"))
         end = time.time()
         print 'Done in ' + str(end - init) + ' secs.\n'
     return codebook

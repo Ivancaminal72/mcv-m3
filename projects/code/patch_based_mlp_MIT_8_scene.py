@@ -5,22 +5,25 @@ os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 
 from utils import *
 from PIL import Image
+import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Reshape
 from keras.preprocessing.image import ImageDataGenerator
 
 #user defined variables
-PATCH_SIZE  = 64
-PATCH_LEN   = 8
+PATCH_SIZE  = 32
+PATCH_LEN   = 32
+DES_LEN = 1024
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split/'
-PATCHES_DIR = '/home/master03/data/'+str(PATCH_LEN)+'patches'
-MODEL_FNAME = '/home/master03/'+str(PATCH_LEN)+'patch_based_mlp.h5'
+PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
+MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'.h5'
+
 
 def build_mlp(input_size=PATCH_SIZE,phase='TRAIN'):
   model = Sequential()
   model.add(Reshape((input_size*input_size*3,),input_shape=(input_size, input_size, 3),name='first'))
-  model.add(Dense(units=2048, activation='relu',name='second'))
+  model.add(Dense(units=DES_LEN, activation='relu',name='second'))
   #model.add(Dense(units=1024, activation='relu'))
   if phase=='TEST':
     model.add(Dense(units=8, activation='linear',name='third')) # In test phase we softmax the average output over the image patches
@@ -51,46 +54,63 @@ print(model.summary())
 print('Done!\n')
 
 if not os.path.exists(MODEL_FNAME):
-  print('WARNING: model file '+MODEL_FNAME+' do not exists!\n')
-  print('Start training...\n')
-  # this is the dataset configuration we will use for training
-  # only rescaling
-  train_datagen = ImageDataGenerator(
+    print('WARNING: model file '+MODEL_FNAME+' do not exists!\n')
+    print('Start training...\n')
+    # this is the dataset configuration we will use for training
+    # only rescaling
+    train_datagen = ImageDataGenerator(
           rescale=1./255,
           horizontal_flip=True)
-  # this is the dataset configuration we will use for testing:
-  # only rescaling
-  test_datagen = ImageDataGenerator(rescale=1./255)
-  # this is a generator that will read pictures found in
-  # subfolers of 'data/train', and indefinitely generate
-  # batches of augmented image data
-  train_generator = train_datagen.flow_from_directory(
+    # this is the dataset configuration we will use for testing:
+    # only rescaling
+    test_datagen = ImageDataGenerator(rescale=1./255)
+    # this is a generator that will read pictures found in
+    # subfolers of 'data/train', and indefinitely generate
+    # batches of augmented image data
+    train_generator = train_datagen.flow_from_directory(
           PATCHES_DIR+'/train',  # this is the target directory
           target_size=(PATCH_SIZE, PATCH_SIZE),  # all images will be resized to PATCH_SIZExPATCH_SIZE
           batch_size=BATCH_SIZE,
           classes = ['coast','forest','highway','inside_city','mountain','Opencountry','street','tallbuilding'],
           class_mode='categorical')  # since we use binary_crossentropy loss, we need categorical L_train
-  # this is a similar generator, for validation data
-  validation_generator = test_datagen.flow_from_directory(
+    # this is a similar generator, for validation data
+    validation_generator = test_datagen.flow_from_directory(
           PATCHES_DIR+'/test',
           target_size=(PATCH_SIZE, PATCH_SIZE),
           batch_size=BATCH_SIZE,
           classes = ['coast','forest','highway','inside_city','mountain','Opencountry','street','tallbuilding'],
           class_mode='categorical')
-  model.fit_generator(
+    history = model.fit_generator(
           train_generator,
           steps_per_epoch=18810 // BATCH_SIZE,
           epochs=150,
           validation_data=validation_generator,
           validation_steps=8070 // BATCH_SIZE)
-  print('Done!\n')
-  print('Saving the model into '+MODEL_FNAME+' \n')
-  model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
-  print('Done!\n')
+    print('Done!\n')
+    print('Saving the model into '+MODEL_FNAME+' \n')
+    model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
+    print('Done!\n')
+
+    # summarize history for accuracy
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.savefig('accuracy.jpg')
+    plt.close()
+    # summarize history for loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.savefig('loss.jpg')
 
 
 print('Building MLP model for testing...\n')
-
 model = build_mlp(input_size=PATCH_SIZE, phase='TEST')
 print(model.summary())
 

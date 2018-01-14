@@ -13,11 +13,12 @@ from keras.preprocessing.image import ImageDataGenerator
 #user defined variables
 PATCH_SIZE  = 64
 PATCH_LEN   = 8
-DES_LEN = 128
+DES_LEN = 2048
 NUM_EPOCHS= 5
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split/'
-PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
+#PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
+PATCHES_DIR = '/share/datasets/MIT_split/'
 MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'_'+str(NUM_EPOCHS)+'_'+str(DES_LEN)+'.h5'
 
 

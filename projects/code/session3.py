@@ -11,7 +11,7 @@ from keras.layers import Flatten, Dense, Reshape
 
 PATCH_SIZE  = 64
 PATCH_LEN   = 8
-DES_LEN = 128
+DES_LEN = 2048
 NUM_EPOCHS = 5
 MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)

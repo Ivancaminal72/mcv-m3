@@ -15,7 +15,7 @@ from scipy.misc import imresize
 
 
 #user defined variables
-IMG_SIZE    = 32
+IMG_SIZE    = 64
 BATCH_SIZE  = 16
 DATASET_DIR = '/share/datasets/MIT_split'
 MODEL_FNAME = '/home/master03/ivan/my_first_mlp.h5'

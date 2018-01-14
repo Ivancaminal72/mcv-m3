@@ -16,12 +16,12 @@ except ImportError:
 #MLP options
 PATCH_SIZE  = 64
 PATCH_LEN   = 8
-DES_LEN = 128
+DES_LEN = 2048
 MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 PATCHES_DIR = '/home/master03/data/patches'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
 MODEL_FNAME = '/home/master03/data/mlp'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)+'.h5'
 #General options
-useBoW = True #Do bag of words
+useBoW = False #Do bag of words
 DESTYPE = "MLP"  #DSIFT/SIFT/spatialPyramids/MLP
 USECV    = False   #True/False
 KERNEL   = 'rbf'   #'rbf'/'poly'/'sigmoid'/'histogramIntersection' (SVM KERNEL)

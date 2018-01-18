@@ -13,11 +13,11 @@ from keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import sys
 
-first_arg = sys.argv[1]
+"""first_arg = sys.argv[1]
 second_arg = sys.argv[2]
 print len(sys.argv)
 print first_arg
-print second_arg
+print second_arg"""
 
 train_data_dir='/share/datasets/MIT_split/train'
 val_data_dir='/share/datasets/MIT_split/test'
@@ -25,7 +25,7 @@ test_data_dir='/share/datasets/MIT_split/test'
 img_width = 224
 img_height=224
 batch_size=32
-number_of_epoch=20
+number_of_epoch=10
 
 
 def preprocess_input(x, dim_ordering='default'):
@@ -53,10 +53,12 @@ def preprocess_input(x, dim_ordering='default'):
 base_model = VGG16(weights='imagenet')
 plot_model(base_model, to_file='modelVGG16a.png', show_shapes=True, show_layer_names=True)
 
-x = base_model.layers[-2].output
+x = base_model.layers[-9].output
+x = Flatten()(x)
+x = Dense(units=2048, activation='relu',name='second')(x)
 x = Dense(8, activation='softmax',name='predictions')(x)
-
 model = Model(input=base_model.input, output=x)
+
 plot_model(model, to_file='modelVGG16b.png', show_shapes=True, show_layer_names=True)
 for layer in base_model.layers:
     layer.trainable = False
@@ -111,7 +113,7 @@ print result
 
 # list all data in history
 
-if False:
+if True:
   # summarize history for accuracy
   plt.plot(history.history['acc'])
   plt.plot(history.history['val_acc'])

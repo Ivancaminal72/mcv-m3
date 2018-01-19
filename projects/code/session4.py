@@ -5,6 +5,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
 from keras.models import Model
+#import keras
 from keras.layers import Flatten
 from keras.layers import Dense, GlobalAveragePooling2D
 from keras import backend as K
@@ -25,7 +26,7 @@ test_data_dir='/share/datasets/MIT_split/test'
 img_width = 224
 img_height=224
 batch_size=32
-number_of_epoch=10
+number_of_epoch=20
 
 
 def preprocess_input(x, dim_ordering='default'):
@@ -54,8 +55,10 @@ base_model = VGG16(weights='imagenet')
 plot_model(base_model, to_file='modelVGG16a.png', show_shapes=True, show_layer_names=True)
 
 x = base_model.layers[-9].output
-x = Flatten()(x)
-x = Dense(units=2048, activation='relu',name='second')(x)
+x = GlobalAveragePooling2D()(x)
+#x = Flatten()(x)
+x = Dense(units=4096, activation='relu',name='firstfull')(x)
+x = Dense(units=4096, activation='relu',name='secondfull')(x)
 x = Dense(8, activation='softmax',name='predictions')(x)
 model = Model(input=base_model.input, output=x)
 
@@ -63,7 +66,8 @@ plot_model(model, to_file='modelVGG16b.png', show_shapes=True, show_layer_names=
 for layer in base_model.layers:
     layer.trainable = False
 
-model.compile(loss='categorical_crossentropy',optimizer='adadelta', metrics=['accuracy'])
+#optimizer=keras.optimizers.Adadelta(lr=2.0,rho=0.95,epsilon=None,decay=0.0,clipnorm=2.0)
+model.compile(loss='categorical_crossentropy',optimizer='Adadelta', metrics=['accuracy'])
 for layer in model.layers:
     print layer.name, layer.trainable
 
@@ -104,10 +108,10 @@ history=model.fit_generator(train_generator,
         samples_per_epoch=batch_size*(int(400*1881/1881//batch_size)+1),
         nb_epoch=number_of_epoch,
         validation_data=validation_generator,
-        nb_val_samples=807)
+        validation_steps=807//batch_size)
 
-
-result = model.evaluate_generator(test_generator, val_samples=807)
+result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
+print model.metrics_names
 print result
 
 

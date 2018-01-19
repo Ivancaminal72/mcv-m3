@@ -5,13 +5,13 @@ os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
 from keras.models import Model
-#import keras
 from keras.layers import Flatten
 from keras.layers import Dense, GlobalAveragePooling2D
 from keras import backend as K
 from keras.utils import plot_model
 from keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
+import numpy as np
 import sys
 
 """first_arg = sys.argv[1]
@@ -73,9 +73,9 @@ for layer in model.layers:
 
 #preprocessing_function=preprocess_input,
 datagen = ImageDataGenerator(featurewise_center=False,
-    samplewise_center=False,
+    samplewise_center=True,
     featurewise_std_normalization=False,
-    samplewise_std_normalization=False,
+    samplewise_std_normalization=True,
 	preprocessing_function=preprocess_input,
     rotation_range=0.,
     width_shift_range=0.,
@@ -104,8 +104,9 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
         batch_size=batch_size,
         class_mode='categorical')
 
-history=model.fit_generator(train_generator,
-        samples_per_epoch=batch_size*(int(400*1881/1881//batch_size)+1),
+history=model.fit_generator(
+        train_generator,
+        samples_per_epoch=416, #13 batches
         nb_epoch=number_of_epoch,
         validation_data=validation_generator,
         validation_steps=807//batch_size)

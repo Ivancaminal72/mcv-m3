@@ -72,6 +72,7 @@ base_model = VGG16(weights='imagenet')
 plot_model(base_model, to_file='modelVGG16a.png', show_shapes=True, show_layer_names=True)
 
 x = base_model.layers[-9].output
+#x = Convolution2D(512, 3, 3, activation='relu')(x)
 x = GlobalAveragePooling2D()(x)
 #x = Flatten()(x)
 x = Dense(units=4096, activation=activation_layers[0],name='firstfull')(x)
@@ -89,11 +90,11 @@ if optimizer == 'Adadelta':
 elif optimizer == 'SGD':
   optimizer = optimizers.SGD(lr=learn_rate,momentum=momentum)
 elif optimizer == 'Adam':
-  optimizer = optimizers.Adam(lr=learn_rate,momentum=momentum)
+  optimizer = optimizers.Adam(lr=learn_rate)
 elif optimizer == 'Adamax':
-  optimizer = optimizers.Adamax(lr=learn_rate,momentum=momentum)
+  optimizer = optimizers.Adamax(lr=learn_rate)
 elif optimizer == 'Nadam':
-  optimizer = optimizers.Nadam(lr=learn_rate,momentum=momentum)
+  optimizer = optimizers.Nadam(lr=learn_rate)
 model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['accuracy'])
 for layer in model.layers:
     print layer.name, layer.trainable

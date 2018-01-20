@@ -1,6 +1,7 @@
 **/.idea
 **/.DS_Store
 **/._*
+**/*.txt
 **/*.png
 **/*.jpg
 **/*.pgm

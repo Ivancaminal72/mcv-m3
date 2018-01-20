@@ -22,7 +22,7 @@ while true
 do
     r1=$(shuf -i 0-5 -n 1)
     #epoch not shufed
-    r3=$(shuf -i 0-6 -n 1)
+    r3=$(shuf -i 4-6 -n 1)
     r4=$(shuf -i 0-5 -n 1)
     r5=$(shuf -i 0-5 -n 1)
     r6_1=$(shuf -i 0-6 -n 1)

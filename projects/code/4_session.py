@@ -27,20 +27,20 @@ test_data_dir='/share/datasets/MIT_split/test'
 
 #Arguments
 batch_size        = int(sys.argv[1]) #32
-epoch_num         = int(sys.argv[2]) #20
-optimizer         = sys.argv[3] #'Adadelta'
-activation_layers = sys.argv[4].split(',') #relu,relu,softmax
-learn_rate        = float(sys.argv[5]) #2.0
-momentum          = float(sys.argv[6]) #2.0
-save_dir          = sys.argv[7] #./my_directory/
+optimizer         = sys.argv[2] #'Adadelta'
+activation_layers = sys.argv[3].split(',') #relu,relu,softmax
+learn_rate        = float(sys.argv[4]) #2.0
+momentum          = float(sys.argv[5]) #2.0
+save_dir          = sys.argv[6] #./my_directory/
 
-filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
+filename = str(batch_size) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
            str(learn_rate) + ' ' + str(momentum)
 
 print('\n'+'\n'+'\n'+filename+'\n'+'\n'+'\n')
 
 img_width = 224
 img_height=224
+epoch_max = 50
 
 if len(activation_layers) < 3:
   raise AssertionError()
@@ -135,7 +135,7 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
 history=model.fit_generator(
         train_generator,
         samples_per_epoch=np.ceil(400/batch_size)*batch_size,
-        nb_epoch=epoch_num,
+        nb_epoch=epoch_max,
         validation_data=validation_generator,
         validation_steps=807//batch_size)
 

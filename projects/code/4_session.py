@@ -1,14 +1,5 @@
-#Arguments 
-#batch_size
-#epochs
-#optimizer
-#activation_layers
-#learn_rate
-#momentum
-#data_augmentation
-#init_mode
-#drop_out
-#image_name
+#4_session.py batch_size epochs optimizer act1,act2,act3 learn_rate
+#momentum data_augmentation init_mode drop_out image_name
 
 import os
 import getpass
@@ -25,30 +16,33 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras import optimizers
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 import sys
 
-"""first_arg = sys.argv[1]
-second_arg = sys.argv[2]
-print len(sys.argv)
-print first_arg
-print second_arg"""
+init = time.time()
 
 train_data_dir='/share/datasets/MIT_split/train'
 val_data_dir='/share/datasets/MIT_split/test'
 test_data_dir='/share/datasets/MIT_split/test'
 
+#Arguments
 batch_size        = int(sys.argv[1]) #32
-number_of_epoch   = int(sys.argv[2]) #20
+epoch_num         = int(sys.argv[2]) #20
 optimizer         = sys.argv[3] #'Adadelta'
-activation_layers = sys.argv[4].split()
-learn_rate        = float(sys.argv[5])
-momentum          = float(sys.argv[6])
-image_name        = sys.argv[7]
+activation_layers = sys.argv[4].split(',') #relu,relu,softmax
+learn_rate        = float(sys.argv[5]) #2.0
+momentum          = float(sys.argv[6]) #2.0
+save_dir          = sys.argv[7] #./my_directory/
+
+filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
+           str(learn_rate) + ' ' + str(momentum)
+
+print('\n'+'\n'+'\n'+filename+'\n'+'\n'+'\n')
 
 img_width = 224
 img_height=224
 
-if( len(activation_layers) < 3 ):
+if len(activation_layers) < 3:
   raise AssertionError()
 
 
@@ -139,8 +133,8 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
 
 history=model.fit_generator(
         train_generator,
-        samples_per_epoch=416, #13 batches
-        nb_epoch=number_of_epoch,
+        samples_per_epoch=np.ceil(400/batch_size)*batch_size,
+        nb_epoch=epoch_num,
         validation_data=validation_generator,
         validation_steps=807//batch_size)
 
@@ -152,20 +146,31 @@ print result
 # list all data in history
 
 if True:
-  # summarize history for accuracy
-  plt.plot(history.history['acc'])
-  plt.plot(history.history['val_acc'])
-  plt.title('model accuracy')
-  plt.ylabel('accuracy')
-  plt.xlabel('epoch')
-  plt.legend(['train', 'validation'], loc='upper left')
-  plt.savefig(image_name+'accuracy.jpg')
-  plt.close()
-  # summarize history for loss
-  plt.plot(history.history['loss'])
-  plt.plot(history.history['val_loss'])
-  plt.title('model loss')
-  plt.ylabel('loss')
-  plt.xlabel('epoch')
-  plt.legend(['train', 'validation'], loc='upper left')
-  plt.savefig(image_name+'loss.jpg')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # results
+    logger = open(save_dir + "log.txt", "a")
+    logger.write(str(result) + '     ' + filename+'\n')
+    logger.close()
+
+    # summarize history for accuracy
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.savefig(save_dir +'accuracy' + filename + '.jpg')
+    plt.close()
+    # summarize history for loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'validation'], loc='upper left')
+    plt.savefig(save_dir +'loss' + filename + '.jpg')
+
+end = time.time()
+print 'Done in ' + str(end - init) + ' secs.\n'

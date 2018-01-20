@@ -14,7 +14,7 @@ except ImportError:
     print "Yael library not found, you can not use fisher vector variables\n"
 
 #MLP options
-PATCH_SIZE  = 64
+PATCH_SIZE  = 128
 PATCH_LEN   = 8
 DES_LEN = 2048
 MLP_DES_DIR = '/home/master03/data/descriptors'+str(PATCH_SIZE)+'_'+str(PATCH_LEN)
@@ -99,7 +99,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             elif DESTYPE == "DSIFT":
                 if FVECTORS:
                     desc, meta = ynumpy.siftgeo_read(filename)
-                    if desc.size == 0: desc = np.zeros((0, 128), dtype = 'uint8')
+                    if desc.size == 0: desc = np.zeros((0, 128), dtype = 'float')
                     # we drop the meta-information (point coordinates, orientation, etc.)
                     image_descs.append(desc)
                 else:
@@ -138,7 +138,7 @@ def featureExtraction(filenames, dataset, codebook = None):
             sample = all_desc[sample_indices]
 
             # until now sample was in uint8. Convert to float32
-            sample = sample.astype('float32')
+            sample = sample.astype('float')
 
             # compute mean and covariance matrix for the PCA
             mean = sample.mean(axis = 0)
@@ -201,7 +201,7 @@ def featureExtraction(filenames, dataset, codebook = None):
         # corresponding descriptors
         descriptors = image_fvs[query_imnos]
         size_descriptors = descriptors[0].shape[1]
-        D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
+        D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.float)
         startingpoint = 0
         for i in range(len(descriptors)):
             D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]
@@ -210,7 +210,7 @@ def featureExtraction(filenames, dataset, codebook = None):
 
     # Transform everything to numpy arrays
     size_descriptors = descriptors[0].shape[1]
-    D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.uint8)
+    D = np.zeros((np.sum([len(p) for p in descriptors]), size_descriptors), dtype=np.float)
     startingpoint = 0
     for i in range(len(descriptors)):
         D[startingpoint:startingpoint + len(descriptors[i])] = descriptors[i]

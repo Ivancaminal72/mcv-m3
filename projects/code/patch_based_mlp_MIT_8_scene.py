@@ -11,7 +11,7 @@ from keras.layers import Flatten, Dense, Reshape
 from keras.preprocessing.image import ImageDataGenerator
 
 #user defined variables
-PATCH_SIZE  = 64
+PATCH_SIZE  = 128
 PATCH_LEN   = 8
 DES_LEN = 2048
 NUM_EPOCHS= 5

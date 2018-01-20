@@ -9,7 +9,7 @@ from PIL import Image, ImageOps
 from keras.models import Model, Sequential
 from keras.layers import Flatten, Dense, Reshape
 
-PATCH_SIZE  = 64
+PATCH_SIZE  = 128
 PATCH_LEN   = 8
 DES_LEN = 2048
 NUM_EPOCHS = 5

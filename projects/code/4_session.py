@@ -66,6 +66,24 @@ def preprocess_input(x, dim_ordering='default'):
         x[:, :, 1] -= 116.779
         x[:, :, 2] -= 123.68
     return x
+
+class EarlyStoppingByLossVal(Callback):
+    def _init_(self, monitor='loss', value=0.01, verbose=0):
+        super(Callback, self)._init_()
+        self.monitor = monitor
+        self.value = value
+        self.verbose = verbose
+
+    def on_epoch_end(self, epoch, logs={}):
+        current = logs.get(self.monitor)
+        if current is None:
+            print("Early stopping requires %s available!" % self.monitor)
+            exit()
+
+        if current < self.value:
+            if self.verbose > 0:
+                print("Epoch %05d: early stopping THR" % epoch)
+            self.model.stop_training = True
     
 # create the base pre-trained model
 base_model = VGG16(weights='imagenet')
@@ -99,7 +117,7 @@ model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['acc
 for layer in model.layers:
     print layer.name, layer.trainable
 
-#preprocessing_function=preprocess_input,
+callbacks = [EarlyStoppingByLossVal(monitor='val_loss', value=0.1, verbose=1)]
 datagen = ImageDataGenerator(featurewise_center=False,
     samplewise_center=True,
     featurewise_std_normalization=False,
@@ -137,7 +155,8 @@ history=model.fit_generator(
         samples_per_epoch=np.ceil(400/batch_size)*batch_size,
         nb_epoch=epoch_max,
         validation_data=validation_generator,
-        validation_steps=807//batch_size)
+        validation_steps=807//batch_size,
+        callbacks=callbacks)
 
 result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
 print model.metrics_names

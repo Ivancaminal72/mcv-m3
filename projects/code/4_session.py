@@ -9,7 +9,7 @@ from keras.applications.vgg16 import VGG16
 from keras.preprocessing import image
 from keras.models import Model
 from keras.layers import Flatten
-from keras.layers import Dense, GlobalAveragePooling2D
+from keras.layers import Dense, GlobalAveragePooling2D, Dropout, Convolution2D
 from keras import backend as K
 from keras.utils import plot_model
 from keras.preprocessing.image import ImageDataGenerator
@@ -27,20 +27,21 @@ test_data_dir='/share/datasets/MIT_split/test'
 
 #Arguments
 batch_size        = int(sys.argv[1]) #32
-optimizer         = sys.argv[2] #'Adadelta'
-activation_layers = sys.argv[3].split(',') #relu,relu,softmax
-learn_rate        = float(sys.argv[4]) #2.0
-momentum          = float(sys.argv[5]) #2.0
-save_dir          = sys.argv[6] #./my_directory/
+epoch_num         = int(sys.argv[2]) #20
+optimizer         = sys.argv[3] #'Adadelta'
+activation_layers = sys.argv[4].split(',') #relu,relu,softmax
+learn_rate        = float(sys.argv[5]) #2.0
+momentum          = float(sys.argv[6]) #2.0
+dropout           = bool(sys.argv[7]) #True False
+save_dir          = sys.argv[8] #./my_directory/
 
-filename = str(batch_size) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
+filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
            str(learn_rate) + ' ' + str(momentum)
 
 print('\n'+'\n'+'\n'+filename+'\n'+'\n'+'\n')
 
 img_width = 224
 img_height=224
-epoch_max = 50
 
 if len(activation_layers) < 3:
   raise AssertionError()
@@ -90,11 +91,15 @@ base_model = VGG16(weights='imagenet')
 plot_model(base_model, to_file='modelVGG16a.png', show_shapes=True, show_layer_names=True)
 
 x = base_model.layers[-9].output
-#x = Convolution2D(512, 3, 3, activation='relu')(x)
+x = Convolution2D(512, 3, 3, activation='relu')(x)
 x = GlobalAveragePooling2D()(x)
 #x = Flatten()(x)
 x = Dense(units=4096, activation=activation_layers[0],name='firstfull')(x)
+if dropout:
+    x = Dropout(0.5)(x)
 x = Dense(units=4096, activation=activation_layers[1],name='secondfull')(x)
+if dropout:
+    x = Dropout(0.5)(x)
 x = Dense(8, activation=activation_layers[2],name='predictions')(x)
 model = Model(input=base_model.input, output=x)
 
@@ -153,7 +158,7 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
 history=model.fit_generator(
         train_generator,
         samples_per_epoch=np.ceil(400/batch_size)*batch_size,
-        nb_epoch=epoch_max,
+        nb_epoch=epoch_num,
         validation_data=validation_generator,
         validation_steps=807//batch_size,
         callbacks=callbacks)

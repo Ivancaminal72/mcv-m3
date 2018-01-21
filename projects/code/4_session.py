@@ -36,16 +36,16 @@ learn_rate         = float(sys.argv[5]) #2.0
 momentum           = float(sys.argv[6]) #2.0
 dropout            = bool (int(sys.argv[7])) #True False
 save_dir            = sys.argv[8] #./my_directory/
-rotation_range      = 0 #6#int (sys.argv[8])
+rotation_range      = 0 #6 #int (sys.argv[8])
 width_shift_range   = 0 #0.2#float(sys.argv[9])
 height_shift_range  = 0 #0.2#float(sys.argv[10])
 shear_range         = 0 #0#float(sys.argv[11])
 zoom_range          = 0 #0.4#float(sys.argv[12])
 channel_shift_range = 0 #0#float(sys.argv[13])
-horizontal_flip     = 0 #1#bool(int(sys.argv[14]))
+horizontal_flip     = 0 #bool(int(sys.argv[14]))
 vertical_flip       = 0 #0#bool(int(sys.argv[15]))
 lastEpoch = 0
-
+dir_data = './../data/s4/'
 
 filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
            str(learn_rate) + ' ' + str(momentum) + ' ' + str(dropout) + ' ' + str(rotation_range) + ' ' + str(width_shift_range) \
@@ -104,7 +104,7 @@ class EarlyStoppingByLossVal(Callback):
             lastEpoch = epoch + 1
 
 class EarlyStoppingByAccVal(Callback):
-    def __init__(self, monitor='val_acc', value=0.2, verbose=1):
+    def __init__(self, monitor='val_acc', value=0.25, verbose=1):
         super(Callback, self).__init__()
         self.monitor = monitor
         self.value = value
@@ -113,7 +113,7 @@ class EarlyStoppingByAccVal(Callback):
         global lastEpoch
         acu_train = logs.get("acc")
         acu_val = logs.get("val_acc")
-        if acu_train != None and acu_val != None and abs(acu_train-acu_val) < self.value:
+        if acu_train != None and acu_val != None and (acu_val-acu_train) > self.value:
             self.model.stop_training = True
             lastEpoch = epoch + 1
     
@@ -149,9 +149,11 @@ elif optimizer == 'Adamax':
   optimizer = optimizers.Adamax(lr=learn_rate)
 elif optimizer == 'Nadam':
   optimizer = optimizers.Nadam(lr=learn_rate)
+
 model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['accuracy'])
 for layer in model.layers:
     print layer.name, layer.trainable
+
 datagen = ImageDataGenerator(featurewise_center=False,
     samplewise_center=True,
     featurewise_std_normalization=False,
@@ -196,6 +198,27 @@ result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
 print model.metrics_names
 print result
 
+if not os.path.exists(dir_data):
+    os.makedirs(dir_data)
+model.save_weights(dir_data+filename+'.h5')
+
+#Second training
+model.load_weights(dir_data+filename+'.h5')
+for layer in base_model.layers:
+    layer.trainable = True
+model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['accuracy'])
+
+for layer in model.layers:
+    print layer.name, layer.trainable
+
+history2=model.fit_generator(
+        train_generator,
+        samples_per_epoch=np.floor(400/batch_size)*batch_size,
+        nb_epoch=epoch_num,
+        validation_data=validation_generator,
+        validation_steps=807//batch_size,
+        callbacks = [EarlyStoppingByLossVal(), EarlyStoppingByAccVal()])
+
 
 # list all data in history
 if True:
@@ -208,8 +231,8 @@ if True:
     logger.close()
 
     # summarize history for accuracy
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
+    plt.plot(history2.history['acc'])
+    plt.plot(history2.history['val_acc'])
     plt.title('model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
@@ -217,13 +240,14 @@ if True:
     plt.savefig(save_dir +'accuracy' + filename + '.jpg')
     plt.close()
     # summarize history for loss
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
+    plt.plot(history2.history['loss'])
+    plt.plot(history2.history['val_loss'])
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'validation'], loc='upper left')
     plt.savefig(save_dir +'loss' + filename + '.jpg')
+
 
 end = time.time()
 print 'Done in ' + str(end - init) + ' secs.\n'

@@ -11,11 +11,13 @@ from keras.models import Model
 from keras.layers import Flatten
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout, Convolution2D
 from keras import backend as K
+from keras.callbacks import Callback
 from keras.utils import plot_model
 from keras.preprocessing.image import ImageDataGenerator
 from keras import optimizers
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 import time
 import sys
 
@@ -26,17 +28,29 @@ val_data_dir='/share/datasets/MIT_split/test'
 test_data_dir='/share/datasets/MIT_split/test'
 
 #Arguments
-batch_size        = int(sys.argv[1]) #32
-epoch_num         = int(sys.argv[2]) #20
-optimizer         = sys.argv[3] #'Adadelta'
-activation_layers = sys.argv[4].split(',') #relu,relu,softmax
-learn_rate        = float(sys.argv[5]) #2.0
-momentum          = float(sys.argv[6]) #2.0
-dropout           = bool(sys.argv[7]) #True False
-save_dir          = sys.argv[8] #./my_directory/
+batch_size         = int(sys.argv[1]) #32
+epoch_num          = int(sys.argv[2]) #20
+optimizer          = sys.argv[3] #'Adadelta'
+activation_layers  = sys.argv[4].split(',') #relu,relu,softmax
+learn_rate         = float(sys.argv[5]) #2.0
+momentum           = float(sys.argv[6]) #2.0
+dropout            = bool (int(sys.argv[7])) #True False
+save_dir            = sys.argv[8] #./my_directory/
+rotation_range      = 0 #6#int (sys.argv[8])
+width_shift_range   = 0 #0.2#float(sys.argv[9])
+height_shift_range  = 0 #0.2#float(sys.argv[10])
+shear_range         = 0 #0#float(sys.argv[11])
+zoom_range          = 0 #0.4#float(sys.argv[12])
+channel_shift_range = 0 #0#float(sys.argv[13])
+horizontal_flip     = 0 #1#bool(int(sys.argv[14]))
+vertical_flip       = 0 #0#bool(int(sys.argv[15]))
+lastEpoch = 0
+
 
 filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
-           str(learn_rate) + ' ' + str(momentum)
+           str(learn_rate) + ' ' + str(momentum) + ' ' + str(dropout) + ' ' + str(rotation_range) + ' ' + str(width_shift_range) \
+           + ' ' + str(height_shift_range) + ' ' + str(shear_range) + ' ' + str(zoom_range) + ' ' + str(channel_shift_range) + ' ' + str(horizontal_flip) \
+           + ' ' + str(vertical_flip)
 
 print('\n'+'\n'+'\n'+filename+'\n'+'\n'+'\n')
 
@@ -46,6 +60,14 @@ img_height=224
 if len(activation_layers) < 3:
   raise AssertionError()
 
+#Set a maximum number of epoch (stop with the callback)
+set_epoch_max = False
+if set_epoch_max:
+    epoch_num = 50
+
+if dropout:
+    epoch_num = 80
+    warnings.warn("Warning: epoch_max is set to :" + str(epoch_num) + " and epoch number parameter is not used")
 
 def preprocess_input(x, dim_ordering='default'):
     if dim_ordering == 'default':
@@ -69,22 +91,17 @@ def preprocess_input(x, dim_ordering='default'):
     return x
 
 class EarlyStoppingByLossVal(Callback):
-    def _init_(self, monitor='loss', value=0.01, verbose=0):
-        super(Callback, self)._init_()
+    def __init__(self, monitor='val_loss', value=0.001, verbose=1):
+        super(Callback, self).__init__()
         self.monitor = monitor
-        self.value = value
+        self.value   = value
         self.verbose = verbose
-
     def on_epoch_end(self, epoch, logs={}):
-        current = logs.get(self.monitor)
-        if current is None:
-            print("Early stopping requires %s available!" % self.monitor)
-            exit()
-
-        if current < self.value:
-            if self.verbose > 0:
-                print("Epoch %05d: early stopping THR" % epoch)
+        global lastEpoch
+        current = logs.get("val_loss")
+        if current != None and current < self.value:
             self.model.stop_training = True
+            lastEpoch = epoch + 1
     
 # create the base pre-trained model
 base_model = VGG16(weights='imagenet')
@@ -97,7 +114,7 @@ x = GlobalAveragePooling2D()(x)
 x = Dense(units=4096, activation=activation_layers[0],name='firstfull')(x)
 if dropout:
     x = Dropout(0.5)(x)
-x = Dense(units=4096, activation=activation_layers[1],name='secondfull')(x)
+x = Dense(units=1024, activation=activation_layers[1],name='secondfull')(x)
 if dropout:
     x = Dropout(0.5)(x)
 x = Dense(8, activation=activation_layers[2],name='predictions')(x)
@@ -121,23 +138,21 @@ elif optimizer == 'Nadam':
 model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['accuracy'])
 for layer in model.layers:
     print layer.name, layer.trainable
-
-callbacks = [EarlyStoppingByLossVal(monitor='val_loss', value=0.1, verbose=1)]
 datagen = ImageDataGenerator(featurewise_center=False,
     samplewise_center=True,
     featurewise_std_normalization=False,
     samplewise_std_normalization=True,
-	preprocessing_function=preprocess_input,
-    rotation_range=0.,
-    width_shift_range=0.,
-    height_shift_range=0.,
-    shear_range=0.,
-    zoom_range=0.,
-    channel_shift_range=0.,
+    preprocessing_function=preprocess_input,
+    rotation_range=rotation_range,
+    width_shift_range=width_shift_range,
+    height_shift_range=height_shift_range,
+    shear_range=shear_range,
+    zoom_range=zoom_range,
+    channel_shift_range=channel_shift_range,
     fill_mode='nearest',
     cval=0.,
-    horizontal_flip=False,
-    vertical_flip=False,
+    horizontal_flip=horizontal_flip,
+    vertical_flip=vertical_flip,
     rescale=None)
 
 train_generator = datagen.flow_from_directory(train_data_dir,
@@ -157,11 +172,11 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
 
 history=model.fit_generator(
         train_generator,
-        samples_per_epoch=np.ceil(400/batch_size)*batch_size,
+        samples_per_epoch=np.floor(400/batch_size)*batch_size,
         nb_epoch=epoch_num,
         validation_data=validation_generator,
         validation_steps=807//batch_size,
-        callbacks=callbacks)
+        callbacks = [EarlyStoppingByLossVal()])
 
 result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
 print model.metrics_names

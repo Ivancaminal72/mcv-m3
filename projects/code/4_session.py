@@ -102,6 +102,20 @@ class EarlyStoppingByLossVal(Callback):
         if current != None and current < self.value:
             self.model.stop_training = True
             lastEpoch = epoch + 1
+
+class EarlyStoppingByAccVal(Callback):
+    def __init__(self, monitor='val_acc', value=0.2, verbose=1):
+        super(Callback, self).__init__()
+        self.monitor = monitor
+        self.value = value
+        self.verbose = verbose
+    def on_epoch_end(self, epoch, logs={}):
+        global lastEpoch
+        acu_train = logs.get("acc")
+        acu_val = logs.get("val_acc")
+        if acu_train != None and acu_val != None and abs(acu_train-acu_val) < self.value:
+            self.model.stop_training = True
+            lastEpoch = epoch + 1
     
 # create the base pre-trained model
 base_model = VGG16(weights='imagenet')
@@ -176,7 +190,7 @@ history=model.fit_generator(
         nb_epoch=epoch_num,
         validation_data=validation_generator,
         validation_steps=807//batch_size,
-        callbacks = [EarlyStoppingByLossVal()])
+        callbacks = [EarlyStoppingByLossVal(), EarlyStoppingByAccVal()])
 
 result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
 print model.metrics_names
@@ -184,7 +198,6 @@ print result
 
 
 # list all data in history
-
 if True:
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

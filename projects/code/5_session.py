@@ -1,15 +1,11 @@
-#4_session.py batch_size epochs optimizer act1,act2,act3 learn_rate
-#momentum data_augmentation init_mode drop_out image_name
-
 import os
 import getpass
 os.environ["CUDA_VISIBLE_DEVICES"]=getpass.getuser()[-1]
 
-from keras.applications.vgg16 import VGG16
+from keras.applications.imagenet_utils import _obtain_input_shape as _obtain_input_shape
 from keras.preprocessing import image
 from keras.models import Model
-from keras.layers import Flatten
-from keras.layers import Dense, GlobalAveragePooling2D, Dropout, Convolution2D
+from keras.layers import Dense, GlobalAveragePooling2D, Dropout, Conv2D,Flatten, Input, MaxPooling2D
 from keras import backend as K
 from keras.callbacks import Callback
 from keras.utils import plot_model
@@ -27,6 +23,7 @@ train_data_dir='/share/datasets/MIT_split/train'
 val_data_dir='/share/datasets/MIT_split/test'
 test_data_dir='/share/datasets/MIT_split/test'
 
+#python 5_session.py 32 20 'Adadelta' relu,relu,softmax 0.0001 2.0 0 ./mini_vgg/
 #Arguments
 batch_size         = int(sys.argv[1]) #32
 epoch_num          = int(sys.argv[2]) #20
@@ -45,12 +42,15 @@ channel_shift_range = 0 #0#float(sys.argv[13])
 horizontal_flip     = 0 #bool(int(sys.argv[14]))
 vertical_flip       = 0 #0#bool(int(sys.argv[15]))
 lastEpoch = 0
-dir_data = './../data/s4/'
+dir_data = './../data/s5/'
 
 filename = str(batch_size) + ' ' + str(epoch_num) + ' ' + str(optimizer) + ' ' + str(activation_layers) + ' ' + \
            str(learn_rate) + ' ' + str(momentum) + ' ' + str(dropout) + ' ' + str(rotation_range) + ' ' + str(width_shift_range) \
            + ' ' + str(height_shift_range) + ' ' + str(shear_range) + ' ' + str(zoom_range) + ' ' + str(channel_shift_range) + ' ' + str(horizontal_flip) \
            + ' ' + str(vertical_flip)
+
+if not os.path.exists(dir_data):
+    os.makedirs(dir_data)
 
 print('\n'+'\n'+'\n'+filename+'\n'+'\n'+'\n')
 
@@ -65,6 +65,7 @@ set_epoch_max = False
 if set_epoch_max:
     epoch_num = 50
 
+#Change epochs if dropout
 if dropout:
     epoch_num = 80
     warnings.warn("Warning: epoch_max is set to :" + str(epoch_num) + " and epoch number parameter is not used")
@@ -91,7 +92,7 @@ def preprocess_input(x, dim_ordering='default'):
     return x
 
 class EarlyStoppingByLossVal(Callback):
-    def __init__(self, monitor='val_loss', value=0.001, verbose=1):
+    def __init__(self, monitor='loss', value=0.001, verbose=1):
         super(Callback, self).__init__()
         self.monitor = monitor
         self.value   = value
@@ -104,7 +105,7 @@ class EarlyStoppingByLossVal(Callback):
             lastEpoch = epoch + 1
 
 class EarlyStoppingByAccVal(Callback):
-    def __init__(self, monitor='val_acc', value=0.25, verbose=1):
+    def __init__(self, monitor='val_acc', value=0.2, verbose=1):
         super(Callback, self).__init__()
         self.monitor = monitor
         self.value = value
@@ -117,26 +118,50 @@ class EarlyStoppingByAccVal(Callback):
             self.model.stop_training = True
             lastEpoch = epoch + 1
     
-# create the base pre-trained model
-base_model = VGG16(weights='imagenet')
-plot_model(base_model, to_file='modelVGG16a.png', show_shapes=True, show_layer_names=True)
+# create model from scratch
+input_shape = _obtain_input_shape(None, 224, 48, K.image_data_format(),True)
+img_input = Input(shape=input_shape)
 
-x = base_model.layers[-9].output
-x = Convolution2D(512, 3, 3, activation='relu')(x)
-x = GlobalAveragePooling2D()(x)
-#x = Flatten()(x)
-x = Dense(units=4096, activation=activation_layers[0],name='firstfull')(x)
+# Block 1
+x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
+x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
+x = MaxPooling2D(pool_size=(2, 2), name='block1_pool')(x)
+
+# Block 2
+x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
+x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
+x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block2_conv3')(x)
+x = MaxPooling2D(pool_size=(2, 2), name='block2_pool')(x)
+
+# Block 3
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1')(x)
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2')(x)
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3')(x)
+x = MaxPooling2D(pool_size=(2, 2), name='block3_pool')(x)
+
+# Block 4
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block4_conv1')(x)
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
+x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block4_conv3')(x)
+x = MaxPooling2D(pool_size=(4, 4), name='block4_pool')(x)
+
+#x = Conv2D(24, (3, 3), activation='relu')(x)
+#x = GlobalAveragePooling2D()(x)
+# Block 5
+#x = Conv2D(24, (3, 3), activation='relu', padding='same', name='block5_conv1')(x)
+#x = Conv2D(24, (3, 3), activation='relu', padding='same', name='block5_conv2')(x)
+#x = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='block5_pool')(x)
+x = Flatten(name='flatten')(x)
+x = Dense(units=2048, activation=activation_layers[0],name='firstfull')(x)
 if dropout:
     x = Dropout(0.5)(x)
-x = Dense(units=1024, activation=activation_layers[1],name='secondfull')(x)
+x = Dense(units=512, activation=activation_layers[1],name='secondfull')(x)
 if dropout:
     x = Dropout(0.5)(x)
 x = Dense(8, activation=activation_layers[2],name='predictions')(x)
-model = Model(input=base_model.input, output=x)
+model = Model(input=img_input, output=x)
 
-plot_model(model, to_file='modelVGG16b.png', show_shapes=True, show_layer_names=True)
-for layer in base_model.layers:
-    layer.trainable = False
+plot_model(model, to_file=dir_data+filename+'.png', show_shapes=True, show_layer_names=True)
 
 print (optimizer)
 if optimizer == 'Adadelta':
@@ -158,7 +183,7 @@ datagen = ImageDataGenerator(featurewise_center=False,
     samplewise_center=True,
     featurewise_std_normalization=False,
     samplewise_std_normalization=True,
-    preprocessing_function=preprocess_input,
+    preprocessing_function=preprocess_input, #TODO: check this!!
     rotation_range=rotation_range,
     width_shift_range=width_shift_range,
     height_shift_range=height_shift_range,
@@ -171,6 +196,7 @@ datagen = ImageDataGenerator(featurewise_center=False,
     vertical_flip=vertical_flip,
     rescale=None)
 
+#TODO: Recheck this in project_feedback.pdf
 train_generator = datagen.flow_from_directory(train_data_dir,
         target_size=(img_width, img_height),
         batch_size=batch_size,
@@ -188,7 +214,7 @@ validation_generator = datagen.flow_from_directory(val_data_dir,
 
 history=model.fit_generator(
         train_generator,
-        samples_per_epoch=np.floor(400/batch_size)*batch_size,
+        steps_per_epoch=1881 // batch_size, #np.floor(400/batch_size)*batch_size
         nb_epoch=epoch_num,
         validation_data=validation_generator,
         validation_steps=807//batch_size,
@@ -198,27 +224,7 @@ result = model.evaluate_generator(test_generator, val_samples=807//batch_size)
 print model.metrics_names
 print result
 
-if not os.path.exists(dir_data):
-    os.makedirs(dir_data)
-model.save_weights(dir_data+filename+'.h5')
-
-#Second training
-model.load_weights(dir_data+filename+'.h5')
-for layer in base_model.layers:
-    layer.trainable = True
-model.compile(loss='categorical_crossentropy',optimizer=optimizer, metrics=['accuracy'])
-
-for layer in model.layers:
-    print layer.name, layer.trainable
-
-history2=model.fit_generator(
-        train_generator,
-        samples_per_epoch=np.floor(400/batch_size)*batch_size,
-        nb_epoch=epoch_num,
-        validation_data=validation_generator,
-        validation_steps=807//batch_size,
-        callbacks = [EarlyStoppingByLossVal(), EarlyStoppingByAccVal()])
-
+#model.save_weights(dir_data+filename+'.h5')
 
 # list all data in history
 if True:
@@ -231,8 +237,8 @@ if True:
     logger.close()
 
     # summarize history for accuracy
-    plt.plot(history2.history['acc'])
-    plt.plot(history2.history['val_acc'])
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
     plt.title('model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
@@ -240,8 +246,8 @@ if True:
     plt.savefig(save_dir +'accuracy' + filename + '.jpg')
     plt.close()
     # summarize history for loss
-    plt.plot(history2.history['loss'])
-    plt.plot(history2.history['val_loss'])
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
